@@ -1,0 +1,19 @@
+property
+  contains a single measurable value
+  has a name
+
+property class
+  the class of a property determines 
+    how it will be observed
+    what properties it depends on
+    how it can be fixed
+    how it is installed
+
+property group
+  contains 0 or more properties
+  can't be nested
+
+property value
+  may be manually or automatically observed  
+
+
