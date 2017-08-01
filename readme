@@ -1,0 +1,5 @@
+can only do as root user:
+  create admin user
+
+can only do as an admin user:
+  
