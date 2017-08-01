@@ -34,7 +34,7 @@ create table if not exists user (
 replace into user set
   user_id=1
   , name='auto'
-  , fullname='Auto Mation'
+  , full_name='Auto Mation'
   ;
 
 create table if not exists user_group_to_user (

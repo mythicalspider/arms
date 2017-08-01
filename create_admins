@@ -1,7 +1,7 @@
 use systemhub;
 
 replace into user 
-    (user_id, name       , fullname) values
+    (user_id, name       , full_name) values
     (2      , 'jgurr'    , 'Jeremy Gurr')
   , (3      , 'cwojtyna' , 'Chris Wojtyna')
   , (4      , 'ablumberg', 'Aaron Blumberg')
