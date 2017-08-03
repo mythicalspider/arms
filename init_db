@@ -8,8 +8,7 @@ use systemhub;
 set default_storage_engine=InnoDB;
 
 create table if not exists global_package_requirements (
-  name varchar(50) not null
-  , unique index (name)
+  name varchar(50) not null primary key
 );
 
 create table if not exists user_group (
@@ -23,14 +22,20 @@ replace into user_group
     (1            , 'admin')
   ;
 
-create table if not exists property_group (
-  property_group_id int auto_increment not null primary key
+create table if not exists prop_group (
+  prop_group_id int auto_increment not null primary key
   , name varchar(25) not null
   , unique index (name)
 );
 
-create table if not exists property_class (
-  property_class_id int auto_increment not null primary key
+create table if not exists prop_group_to_prop_group (
+  parent int not null
+  , child int not null
+  , primary key (parent, child)
+);
+
+create table if not exists prop_class (
+  prop_class_id int auto_increment not null primary key
   , name varchar(25) not null
   , unique index (name)
 );
@@ -70,36 +75,36 @@ create table if not exists user_group_to_user (
   , foreign key (user_id) references user(user_id) on update cascade on delete cascade
 );
 
-create table if not exists property (
-  property_id int auto_increment not null primary key
-  , property_group_id int not null
+create table if not exists prop (
+  prop_id int auto_increment not null primary key
+  , prop_group_id int not null
   , name varchar(25) not null
-  , property_class_id int not null
+  , prop_class_id int not null
   , observation_frequency tinyint not null comment '0 mean no auto observation. 10 means wait 10 seconds between observations, 20=100 secs, 30=1000 secs'
   , index (name)
-  , foreign key (property_group_id) references property_group(property_group_id) on update cascade on delete cascade
-  , foreign key (property_class_id) references property_class(property_class_id) on update cascade on delete cascade
+  , foreign key (prop_group_id) references prop_group(prop_group_id) on update cascade on delete cascade
+  , foreign key (prop_class_id) references prop_class(prop_class_id) on update cascade on delete cascade
 );
 
-create table if not exists property_existence_implication (
-  property_id int not null
-  , implies_property int not null
-  , primary key (property_id, implies_property)
-  , foreign key (property_id) references property(property_id) on update cascade on delete cascade
-  , foreign key (implies_property) references property(property_id) on update cascade on delete restrict
+create table if not exists prop_existence_implication (
+  prop_id int not null
+  , implies_prop int not null
+  , primary key (prop_id, implies_prop)
+  , foreign key (prop_id) references prop(prop_id) on update cascade on delete cascade
+  , foreign key (implies_prop) references prop(prop_id) on update cascade on delete restrict
 );
 
-create table if not exists property_access (
-  property_id int not null
+create table if not exists prop_access (
+  prop_id int not null
   , user_group_id int not null
   , access_level enum('read','update','create','delete') not null
-  , foreign key (property_id) references property(property_id) on update cascade on delete cascade
+  , foreign key (prop_id) references prop(prop_id) on update cascade on delete cascade
   , foreign key (user_group_id) references user_group(user_group_id) on update cascade on delete cascade
-  , primary key (property_id, user_group_id, access_level)
+  , primary key (prop_id, user_group_id, access_level)
 );
 
 create table if not exists last_observation (
-  property_id int not null primary key
+  prop_id int not null primary key
   , last_observation_time datetime comment 'null means not observed yet'
   , next_observation_time datetime comment 'null means never auto observe'
   , observed_value varchar comment 'null means not observed or failed to observe'
@@ -112,10 +117,10 @@ create table if not exists last_observation (
 -- if value is the same, the last record is updated
 create table if not exists observation_history (
   observation_history_id bigint not null primary key auto_increment
-  , property_id int not null
+  , prop_id int not null
   , from_time datetime not null
   , to_time datetime not null
   , observed_value varchar comment 'null means not observed or failed to observe'
-  , unique index (property_id, to_time)
+  , unique index (prop_id, to_time)
 );
 

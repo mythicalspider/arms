@@ -1,6 +1,7 @@
 property
   contains a single measurable value
-  has a name
+  has a name which may the same as other properties
+    in which case the only way to distinguish it is by property group
 
 property class
   the class of a property determines 
@@ -11,9 +12,36 @@ property class
 
 property group
   contains 0 or more properties
-  can't be nested
+  may be nested
+  can't have two properties with the same name
+  purpose
+    easy access of specific properties
+    control of resource provisioning
+      when a property is being automatically provisioned, it will search parent property groups until it finds the needed resource
+
+property status
+  how well the observed value of a property matches it's expected value
+  color:
+    violet - no issues: service unused / idle. 
+    blue - no issues: performing far above the required levels, lots of resources to spare (under 1/4 capacity)
+    green - no issues: within normal operating levels
+    yellow - minor issues: below required levels / over capacity, but still functional. Will need to address this issue eventually.
+    orange - major issues: significantly below required performance levels, failures happening, but still mostly functional. 
+    red - critical issues: services are down
+    grey - major issues: monitoring is failing or unavailable. Status unknown.
+  severity:
+    0 - no issues (violet, blue, green)
+    1 - minor (yellow)
+    2 - major (orange, grey)
+    3 - critical (red)
 
 property value
   may be manually or automatically observed  
 
+user
+  may represent a human or a special automation user
+
+user group
+  controls permissions that users belonging to the group have
+  may be nested
 
