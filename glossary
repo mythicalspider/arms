@@ -1,7 +1,20 @@
+expectation status
+  G matches
+  Y doesn't match, will auto-fix
+  R doesn't match, can't auto-fix
+
+intention status
+  X pending approval
+  G immediate approval: can proceed with the change now
+  Y delayed approval: will need to wait until a certain time window
+  R rejected: will never be allowed
+
 property
   contains a single measurable value
   has a name which may the same as other properties
     in which case the only way to distinguish it is by property group
+  can have sub-properties
+  if there is no observer defined and it has sub-properties, status is worst of sub-prop status
 
 property class
   the class of a property determines 
@@ -21,27 +34,43 @@ property group
 
 property status
   how well the observed value of a property matches it's expected value
+  service up intention:
   color:
-    violet - no issues: service unused / idle. 
-    blue - no issues: performing far above the required levels, lots of resources to spare (under 1/4 capacity)
-    green - no issues: within normal operating levels
-    yellow - minor issues: below required levels / over capacity, but still functional. Will need to address this issue eventually.
-    orange - major issues: significantly below required performance levels, failures happening, but still mostly functional. 
-    red - critical issues: services are down
-    grey - major issues: monitoring is failing or unavailable. Status unknown.
+    V violet - no issues: service unused / idle. 
+    I indigo - no issues: service less than 1/16 usage
+    B blue - no issues: performing far above the required levels, lots of resources to spare (under 1/4 capacity)
+    G green - no issues: within normal operating levels
+    Y yellow - minor issues: below required levels / over capacity, but still functional. Will need to address this issue eventually.
+    O orange - major issues: significantly below required performance levels, rare failures happening, but still mostly functional. 
+    M flashing orange - major issues: monitoring is failing or unavailable. Status unknown.
+    R red - critical issues: services are down or frequently failing. Or missing a critical resource.
+    ! flashing red - super critical issue: catastrophic failure
+
   severity:
-    0 - no issues (violet, blue, green)
-    1 - minor (yellow)
-    2 - major (orange, grey)
-    3 - critical (red)
+    0 - no issues (violet, indigo, blue, green)
+    1 - minor (yellow): issues that will need attending to eventually
+    2 - major (orange, grey): issues that need immediate attention before failure happens
+    3 - critical (red): failure has happened
+    4 - super critical (flashing red): something worse than an outage has occurred
+
+  service down intention:
+    G service is down
+    R service is up
 
 property value
   may be manually or automatically observed  
 
+resource consumer
+  a property which needs a certain type of resource. May be manually or automatically provisioned
+
+resource provider
+  a property which contains resources which may be automatically or manually provisioned to another property.
+  
 user
   may represent a human or a special automation user
 
 user group
   controls permissions that users belonging to the group have
   may be nested
+
 
