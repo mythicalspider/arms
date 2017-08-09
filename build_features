@@ -1,0 +1,34 @@
+#!/bin/bash
+
+featureset="$1"
+
+if [ ! "$featureset" ]; then
+  echo "Usage: $0 {featureset}"
+  echo " from the folder containing a features and feature_sets folders"
+  echo "current featuresets: $(find feature_sets -mindepth 1 -maxdepth 1 -not -name '.*' -type f -printf "%f ")"
+  exit 1
+fi
+
+unset cat_no_comments
+cat_no_comments() {
+  cat "$@" | grep -v "^ *#"
+}
+
+unset features
+for feature in $(cat_no_comments feature_sets/$featureset); do
+  fp=features/$feature/before 
+  if [ -f "$fp" ]; then
+    echo "$feature before"
+    source $fp || exit 1
+  fi
+  features=( $feature "${features[@]}" )
+done
+
+for feature in "${features[@]}"; do
+  fp=features/$feature/after
+  if [ -f "$fp" ]; then
+    echo "$feature after"
+    source $fp || exit 1
+  fi
+done
+

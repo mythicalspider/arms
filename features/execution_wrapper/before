@@ -1,0 +1,5 @@
+build_folder=/tmp/fop_build_$$
+rm -rf $build_folder || exit 1
+mkdir $build_folder || exit 1
+
+
