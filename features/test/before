@@ -1,0 +1,24 @@
+if [ ! "$build_folder" ]; then
+  echo "build_folder not set"
+  exit 1
+fi
+
+mkdir -p $build_folder/tests || exit 1
+
+mkdir -p $build_folder/tests/first_group || exit 1
+cat >$build_folder/tests/test1 <<EOF
+true
+EOF
+cat >$build_folder/tests/test2 <<EOF
+true
+EOF
+cat >$build_folder/tests/first_group/test3 <<EOF
+true
+EOF
+cat >$build_folder/tests/first_group/test4 <<EOF
+false
+EOF
+cat >$build_folder/tests/first_group/test5 <<EOF
+true
+EOF
+
