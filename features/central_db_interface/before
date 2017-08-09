@@ -1,0 +1,14 @@
+#!/bin/bash
+
+#if system_matches "linux gentoo"; then
+#  
+#fi
+
+cat >$build_folder/init_db.sql <<EOF
+-- comment this out if you don't want to start from a clean slate
+drop database if exists systemhub;
+create database if not exists systemhub;
+use systemhub;
+set default_storage_engine=InnoDB;
+
+EOF

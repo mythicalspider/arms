@@ -1,5 +1,7 @@
-build_folder=/tmp/fop_build_$$
-rm -rf $build_folder || exit 1
-mkdir $build_folder || exit 1
+# clean up after ourselves
+#rmr /tmp/fop_build &>/dev/null
 
+build_folder=/tmp/fop_build/$$
+rm -rf $build_folder &>/dev/null || exit 1
+mkdir -p $build_folder || exit 1
 

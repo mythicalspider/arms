@@ -14,8 +14,36 @@ cat_no_comments() {
   cat "$@" | grep -v "^ *#"
 }
 
+unset verify_dependencies
+verify_dependencies() {
+  local dp=features/$feature/dependencies
+  local found f
+  if [ -f $dp ]; then
+    for dependency in $(cat_no_comments $dp); do
+      unset found
+      for f in "${features[@]}"; do
+        if [ "$f" == "$dependency" ]; then
+          found=true
+          break
+        fi
+      done
+      if [ ! "$found" ]; then 
+        echo "error: feature [$feature] requires [$dependency] to be present earlier in the featureset"
+        return 1
+      fi
+    done
+  fi
+}
+
+source lib/system_handlers
+
 unset features
 for feature in $(cat_no_comments feature_sets/$featureset); do
+  if [ ! -d features/$feature ]; then
+    echo "error: missing feature: $feature"
+    exit 1
+  fi
+  verify_dependencies || exit 1
   fp=features/$feature/before 
   if [ -f "$fp" ]; then
     echo "$feature before"

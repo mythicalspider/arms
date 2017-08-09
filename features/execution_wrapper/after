@@ -1,0 +1,2 @@
+echo "Build scripts created in: $build_folder"
+
