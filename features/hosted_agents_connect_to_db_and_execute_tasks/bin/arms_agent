@@ -1,8 +1,34 @@
 #!/bin/bash
 
+if [ ! -d lib ]; then
+  echo "Missing lib folder. Make sure you run this script from the directory where it is, and that the lib folder is there with the required scripts."
+  exit 1
+fi
+
+source lib/* || exit 1
+
+unset dbexecute
+dbexecute() {
+mysql -N -u$db_user -p$db_pass $db_host "${@:-}" || return 1
+}
+
 if [ ! -f arms_agent.config ]; then
   echo "Missing arms_agent.config. It must exist in the current directory."
   exit 1
 fi
 
+source arms_agent.config
+requireVar host_id db_host db_user db_pass || {
+  echo "Make sure that you have defined this variable in your arms_agent.config file"
+  exit 1
+}
 
+echo "
+  select tr.task_request_id, s.content, tr.parameters 
+  from task_request_not_done trnd 
+  inner join task_request tr using (task_request_id)
+  inner join script s using (script_id)
+  left join task_status_change tsc on trnd.task_request_id = tsc.task_request_id
+  where host_id = $host_id
+  and tsc.task_request_id is null
+  " | dbexecute

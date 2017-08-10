@@ -37,12 +37,14 @@ EOF
 
   bin/arms_agent || fail
 
-  [ $(echo "select count(*) from task_status_change where host_id=1 and new_status='started' and task_request_id=1" | dbexecute $central_db_name) == 1 ] || {
+  [ $(echo "select count(*) from task_status_change 
+            where host_id=1 and new_status='started' and task_request_id=1" | dbexecute $central_db_name) == 1 ] || {
       echo "Missing proper 'started' task_status_change record"
       fail
      }
-  [ $(echo "select count(*) from task_status_change where host_id=1 and new_status='succeeded' and task_request_id=1" | dbexecute $central_db_name) == 1 ] || {
-      echo "Missing proper 'succeeded' task_status_change record"
+  [ $(echo "select count(*) from task_status_change 
+            where host_id=1 and new_status='done' and task_request_id=1 and result='succeeded'" | dbexecute $central_db_name) == 1 ] || {
+      echo "Missing proper 'done' task_status_change record"
       fail
      }
 

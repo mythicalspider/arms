@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# usage: requireFunction {function(s) to check...}
+# exits if the function doesn't exist
+unset requireFunction
+requireFunction() {
+for i ; do
+  tempStatus=`type $i >/dev/null 2>&1 && echo true`
+  if [ -z "$tempStatus" ]; then
+    echo "Missing function: $i"
+    return 1
+  fi
+done
+}
+
+# usage: requireVar {variable(s) to check...}
+# exits if the variable doesn't exist
+unset requireVar
+requireVar() {
+for i ; do
+  v=`eval echo "$"$i`
+  if [ -z "$v" ]; then
+    v=`eval echo "$"{#$i[*]}`
+    if [ "$v" == "0" ]; then
+      echo "Missing variable: $i"
+      stackTrace
+      return 1
+    fi
+  fi
+done
+}

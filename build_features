@@ -43,6 +43,8 @@ source lib/bash_exceptions
 source lib/ansi_codes
 source lib/hydration
 source lib/rsync_shortcuts
+source lib/requirements
+source lib/logging
 
 unset standard_convention
 standard_convention() {
