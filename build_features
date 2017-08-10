@@ -42,6 +42,7 @@ source lib/system_handlers
 source lib/bash_exceptions
 source lib/ansi_codes
 source lib/hydration
+source lib/rsync_shortcuts
 
 unset standard_convention
 standard_convention() {
@@ -52,7 +53,10 @@ standard_convention() {
     cat init_db.sql.template | hydrate_template >>$build_folder/init_db.sql || return 1
   fi
   if [ -d tests ]; then
-    rsync -a tests/ $build_folder/tests/ >/dev/null || return 1
+    rcpx tests/ $build_folder/tests/ >/dev/null || return 1
+  fi
+  if [ -d bin ]; then
+    rcpx bin/ $build_folder/bin/ >/dev/null || return 1
   fi
 }
 

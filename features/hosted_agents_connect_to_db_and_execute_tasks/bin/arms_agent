@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ ! -f arms_agent.config ]; then
+  echo "Missing arms_agent.config. It must exist in the current directory."
+  exit 1
+fi
+
+

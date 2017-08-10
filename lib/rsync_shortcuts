@@ -1,0 +1,21 @@
+#!/bin/bash
+
+unset rcp
+rcp() {
+local shell="ssh"
+if [ "${port:-}" ]; then
+    shell="ssh -p $port"
+fi
+RSYNC_RSH="$shell" rsync -aIu "$@"
+}
+
+# rsync but exclude temp and dummy files
+unset rcpx
+rcpx() {
+local shell="ssh"
+if [ "${port:-}" ]; then
+    shell="ssh -p $port"
+fi
+RSYNC_RSH="$shell" rsync -aIu --exclude '*.sw*' "$@"
+}
+
