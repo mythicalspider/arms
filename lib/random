@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# usage: random {p=number of possibilities}
+#   sets r={random number between 0 and p-1}
+#   it will be fairly evenly distributed below about 1000, but will become more biased as it gets higher
+unset random
+random() {
+  local p=$1
+  r=$((RANDOM % p))
+}
+

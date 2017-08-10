@@ -10,13 +10,13 @@
 #  export MYSQL_READ_TIMEOUT=10
 #  
 #  # Connect to db and get $HANDLE
-#  mysql_connect -u mydbuser -d mydb -H mydbserver
+#  user=mydbuser db=mydb host=myhost mysql_connect 
 #  
 #  #query db and get $DATA
-#  mysql_query $HANDLE "SELECT dt_whatever from tbl_lol WHERE dt_rofl=10"
+#  mysql_query "SELECT dt_whatever from tbl_lol WHERE dt_rofl=10"
 #  
 #  #close connection
-#  mysql_close $HANDLE
+#  mysql_close
 #  
 #  
 #  $DATA[0] = affected rows/number of sets;
@@ -37,6 +37,16 @@
 #      field2key   = ${DATA[$i+2]}; #this is "dt_name"
 #      field2value = ${DATA[$i+3]}; #this is the value  for dt_name
 #  done
+#
+#  # managing multiple connections at the same time:
+#  user=mydbuser db=mydb host=myhost1 mysql_connect && con1=$HANDLE
+#  user=mydbuser db=mydb host=myhost2 mysql_connect && con2=$HANDLE
+#
+#  HANDLE=$con1 mysql_query "select ..."
+#  HANDLE=$con2 mysql_query "select ..."
+#
+#  HANDLE=$con1 mysql_close
+#  HANDLE=$con2 mysql_close
 
 # set a default here
 export MYSQL_READ_TIMEOUT=10
@@ -99,6 +109,9 @@ function mysql_query {
   fi
   handle=(${HANDLE//_/ })
 
+  # use this to keep track of where you are when reading this data
+  export current_row=0
+
   # delimit query; otherwise we block forever/timeout
   query=$2
   if [[ ! "$query" =~ \;\$ ]]; then
@@ -148,6 +161,7 @@ function mysql_query {
         row_open=0
         DATA[0]=$[${DATA[0]}+1]
         DATA[1]=$cols
+        column_count=$cols
       fi
     fi
 
@@ -161,6 +175,33 @@ function mysql_query {
   #if read times out O_o
   echo "$FUNCNAME: Read timed out!"
   return 1
+}
+
+# returns true if the previous mysql_query command returned 1 or more rows
+function more_rows_to_read {
+  if [ ! "${DATA:-}" ]; then
+    return 1
+  fi
+  if [[ ${DATA[0]} > $current_row ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# usage: grab_row {var1} {var2}...
+# takes data from the previously run mysql_query command and stores it into the given variables
+# it will always advance to the next row for each call, even if you don't capture all of the columns of the row
+function grab_row {
+  local v next_data_index
+  # take each var and dump a field value into it
+  next_data_index=$((current_row*column_count+2+1))
+  for var_name ; do
+    v=${DATA[$next_data_index]}
+    next_data_index=$((next_data_index+2))
+    v=${v//\"/\\\"}
+    eval "$var_name=\"$v\""
+  done
+  current_row=$((current_row+1))
 }
 
 # usage: HANDLE={handle} mysql_close

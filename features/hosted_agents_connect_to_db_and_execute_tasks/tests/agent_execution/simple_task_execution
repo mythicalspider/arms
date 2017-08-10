@@ -30,7 +30,7 @@ EOF
 
   cat <<EOF >arms_agent.config || fail
 db_host=127.0.0.1
-db_user=test
+db_user=agent
 db_pass=insecure
 host_id=1
 EOF
