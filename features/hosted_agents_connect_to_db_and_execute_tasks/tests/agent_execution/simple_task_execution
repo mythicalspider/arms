@@ -1,0 +1,48 @@
+#!/bin/bash
+
+while true; do
+  returnValue=0
+
+  cat <<EOF | dbexecute || fail
+use $central_db_name;
+
+insert into host set
+  host_id = 1
+  , name = 'test_host'
+  , primary_ip = ''
+  ;
+
+insert into script set
+  script_id = 1
+  , name = 'test_script'
+  , version = 1
+  , parameters = ''
+  , content = 'echo success'
+  ;
+
+insert into task_request set 
+  task_request_id = 1
+  , host_id = 1
+  , script_id = 1
+  , parameters = ''
+  ;
+EOF
+
+  cd $build_folder || fail
+
+  cat <<EOF >arms_agent.config || fail
+db_host=127.0.0.1
+db_user=test
+db_pass=insecure
+host_id=1
+EOF
+
+  bin/arms_agent || fail
+
+  cd $OLDPWD || fail
+
+  break
+done
+
+handleReturn
+

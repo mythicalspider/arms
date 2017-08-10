@@ -1,11 +1,3 @@
-#!/bin/bash
-
-#if system_matches "linux gentoo"; then
-#  
-#fi
-
-cat >>$build_folder/init_db.sql <<EOF
-
 create table if not exists prop_class (
   prop_class_id int auto_increment not null primary key
   , name varchar(50) not null
@@ -24,4 +16,3 @@ create table if not exists prop (
   , foreign key (prop_class_id) references prop_class(prop_class_id) on update cascade on delete cascade
   , foreign key (host_id) references host(host_id) on update cascade on delete cascade
 );
-EOF

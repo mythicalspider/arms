@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# clean up after ourselves
+rm -rf /tmp/fop_build &>/dev/null
+true

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# error out if we try to use an unset variable
+set -u
+
 featureset="$1"
 
 if [ ! "$featureset" ]; then
@@ -36,27 +39,58 @@ verify_dependencies() {
 }
 
 source lib/system_handlers
+source lib/bash_exceptions
+source lib/ansi_codes
+source lib/hydration
 
-unset features
-for feature in $(cat_no_comments feature_sets/$featureset); do
-  if [ ! -d features/$feature ]; then
-    echo "error: missing feature: $feature"
-    exit 1
+unset standard_convention
+standard_convention() {
+  if [ -f init_db.sql ]; then
+    cat init_db.sql >>$build_folder/init_db.sql || return 1
   fi
-  verify_dependencies || exit 1
-  fp=features/$feature/before 
-  if [ -f "$fp" ]; then
-    echo "$feature before"
-    source $fp || exit 1
+  if [ -f init_db.sql.template ]; then
+    cat init_db.sql.template | hydrate_template >>$build_folder/init_db.sql || return 1
   fi
-  features=( $feature "${features[@]}" )
-done
+  if [ -d tests ]; then
+    rsync -a tests/ $build_folder/tests/ >/dev/null || return 1
+  fi
+}
 
-for feature in "${features[@]}"; do
-  fp=features/$feature/after
-  if [ -f "$fp" ]; then
-    echo "$feature after"
-    source $fp || exit 1
-  fi
-done
+unset process_features
+process_features() {
+  local feature features="" fp 
+  for feature in $(cat_no_comments feature_sets/$featureset); do
+    if [ ! -d features/$feature ]; then
+      echo "error: missing feature: $feature"
+      exit 1
+    fi
+    echo "Before feature: $feature"
+
+    verify_dependencies || exit 1
+    fp=features/$feature
+    cd $fp || exit 1
+
+    if [ -f "before" ]; then
+      source ./before || exit 1
+    fi
+
+    standard_convention || exit 1
+
+    cd ../.. || exit 1
+
+    features=( $feature "${features[@]}" )
+  done
+
+  for feature in "${features[@]}"; do
+    fp=features/$feature
+    if [ -f "$fp/after" ]; then
+      echo "After feature: $feature"
+      cd $fp || exit 1
+      source ./after || exit 1
+      cd ../.. || exit 1
+    fi
+  done
+}
+
+process_features
 

@@ -1,11 +1,3 @@
-#!/bin/bash
-
-#if system_matches "linux gentoo"; then
-#  
-#fi
-
-cat >>$build_folder/init_db.sql <<EOF
-
 create table if not exists user (
   user_id int auto_increment not null primary key
   , name varchar(25) not null
@@ -18,4 +10,3 @@ replace into user
     (1      , 'auto' , 'Auto Mation' )
   , (2      , 'admin', 'System Admin')
   ;
-EOF

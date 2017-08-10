@@ -1,11 +1,3 @@
-#!/bin/bash
-
-#if system_matches "linux gentoo"; then
-#  
-#fi
-
-cat >>$build_folder/init_db.sql <<EOF
-
 create table if not exists contact_method (
   contact_method_id int auto_increment not null primary key
   , name varchar(25) not null comment 'example: email, slack, text_message'
@@ -20,4 +12,3 @@ create table if not exists user_to_contact_method (
   , min_severity int not null default 0 comment 'will not use this contact method unless the message has a minimum severity level of this number'
   , primary key (user_id, contact_method_id, address)
 );
-EOF

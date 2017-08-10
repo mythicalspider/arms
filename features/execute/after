@@ -1,3 +1,5 @@
+#!/bin/bash
+
 echo "Applying database changes..."
-cat $build_folder/init_db.sql | mysql -utest -pinsecure || exit 1
+cat $build_folder/init_db.sql | dbexecute || exit 1
 

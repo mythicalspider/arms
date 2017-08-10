@@ -1,15 +1,5 @@
 echo "Running tests..."
 
-unalias fail &>/dev/null
-alias fail='{ returnValue=1; break; }'
-# should be placed after any loop inside of an exception catching block
-unalias maybeBreak &>/dev/null
-alias maybeBreak='[ $returnValue == 0 ] || break;'
-
-RED=$'\033[01;31m'
-GREEN=$'\033[01;32m'
-RESET=$'\033[0m'
-
 test_result_path=$build_folder/test_results
 rm $test_result_path &>/dev/null
 
@@ -20,6 +10,7 @@ executeTests() {
     echo -n "$file: "
     source $path/$file >>$test_result_path || {
       echo "${RED}[Failed]${RESET}"
+      cat $test_result_path
       fail
     }
     echo "${GREEN}[Success]${RESET}"

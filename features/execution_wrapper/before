@@ -1,7 +1,7 @@
-# clean up after ourselves
-#rmr /tmp/fop_build &>/dev/null
+#!/bin/bash
 
 build_folder=/tmp/fop_build/$$
 rm -rf $build_folder &>/dev/null || exit 1
 mkdir -p $build_folder || exit 1
+echo "Writing to build_folder: $build_folder"
 
