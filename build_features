@@ -3,7 +3,7 @@
 # error out if we try to use an unset variable
 set -u
 
-featureset="$1"
+featureset="${1:-}"
 
 if [ ! "$featureset" ]; then
   echo "Usage: $0 {featureset}"

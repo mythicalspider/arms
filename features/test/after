@@ -1,3 +1,5 @@
+#!/bin/bash
+
 echo "Running tests..."
 
 test_result_path=$build_folder/test_results
@@ -8,7 +10,7 @@ executeTests() {
   local path="$1" file dir returnValue=0
   for file in $(find $path -mindepth 1 -maxdepth 1 -type f -printf "%f\n" | sort); do
     echo -n "$file: "
-    source $path/$file >>$test_result_path || {
+    source $path/$file >>$test_result_path 2>&1 || {
       echo "${RED}[Failed]${RESET}"
       cat $test_result_path
       fail
