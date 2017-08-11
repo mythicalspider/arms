@@ -38,14 +38,15 @@ create table if not exists task_request_not_done (
 create table if not exists task_status_change (
   task_status_change_id int auto_increment not null primary key
   , task_request_id int not null
-  , host_id int not null
-  , output_id int comment 'null means the output no longer exists, or it does not apply to this status'
+  , output_id int default null comment 'null means the output no longer exists, or it does not apply to this status'
+  , error_id int default null comment 'null means the output no longer exists, or it does not apply to this status'
   , event_time datetime not null
   , new_status enum('started', 'done') not null
   , result enum('succeeded', 'failed') default null comment 'null if the result has not been determined yet'
   , foreign key (task_request_id) references task_request(task_request_id) on update cascade on delete cascade
   , foreign key (host_id) references host(host_id) on update cascade on delete cascade
-  , foreign key (output_id) references script(script_id) on update cascade on delete set null
+  , foreign key (output_id) references output(output_id) on update cascade on delete set null
+  , foreign key (error_id) references output(output_id) on update cascade on delete set null
 );
 
 -- create agent user

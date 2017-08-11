@@ -43,6 +43,31 @@ can_launch_more_processes() {
   [ ! "$job_id" ] && return 1
 }
 
+# returns true (rc=0) if there is at least one completed process to be removed from the pool
+#   sets 
+#     job_pid = pid of the process which completed
+#     job_id = slot id of the process
+#   and removes the job from the tracked list
+grab_completed_process() {
+  unset job_id job_pid
+  local j
+  # free up worker slots if jobs are done
+  for ((i=0; i<max_tracked_processes; i++)); do
+    j=${process_pool[$i]}
+    if [ "$j" ]; then
+      if is_still_running $j; then
+        continue
+      else
+        job_pid=${process[$i]}
+        job_id=$i
+        process_pool[$i]=
+      fi
+    fi
+  done
+
+  [ ! "$job_id" ] && return 1
+}
+
 # intended to be run immediately after launching a background process (which sets $!), 
 #   and after can_launch_more_processes was run successfully, which sets $job_id
 track_process() {
