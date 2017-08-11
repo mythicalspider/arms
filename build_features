@@ -38,13 +38,7 @@ verify_dependencies() {
   fi
 }
 
-source lib/system_handlers
-source lib/bash_exceptions
-source lib/ansi_codes
-source lib/hydration
-source lib/rsync_shortcuts
-source lib/requirements
-source lib/logging
+source lib/*
 
 unset standard_convention
 standard_convention() {

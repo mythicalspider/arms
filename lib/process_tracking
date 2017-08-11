@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# functions to track a pool of linux processes launched from shell commands. When a process ends, a slot becomes available
+# creates the following global variables:
+#   max_tracked_processes
+#   process_pool[]       contains pid of each process
+#
+# example:
+#   initialize_process_tracking 4    # sets up worker pool with a maximum of 4 workers
+#   if can_launch_more_processes; then
+#     sh my_script &
+#     track_process
+#   fi
+#
+# requires: process_info
+
+# set up the process tracking pool
+# usage: initialize_process_tracking {max num of processes}
+initialize_process_tracking() {
+  max_tracked_processes=$1
+  # this contains the pids of each process in the pool
+  process_pool=();
+}
+
+# returns true (rc=0) if there is room for more processes in the tracking pool
+#   sets job_id = slot id of the first free slot
+can_launch_more_processes() {
+  unset job_id
+  local j
+  # free up worker slots if jobs are done
+  for ((i=0; i<max_tracked_processes; i++)); do
+    j=${process_pool[$i]}
+    if [ "$j" ]; then
+      if is_still_running $j; then
+        continue
+      else
+        process_pool[$i]=
+      fi
+    fi
+    job_id=$i
+  done
+
+  [ ! "$job_id" ] && return 1
+}
+
+# intended to be run immediately after launching a background process (which sets $!), 
+#   and after can_launch_more_processes was run successfully, which sets $job_id
+track_process() {
+  process_pool[$job_id]=$!
+}
+

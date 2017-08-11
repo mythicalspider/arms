@@ -1,0 +1,6 @@
+#!/bin/bash
+
+unset is_still_running
+is_still_running() {
+ps -p $1 &>/dev/null
+}
