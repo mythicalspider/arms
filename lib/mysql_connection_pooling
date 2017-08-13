@@ -204,6 +204,15 @@ function grab_row {
   current_row=$((current_row+1))
 }
 
+# usage: dbfetch_single_value {query}
+#   sets r={value returned}
+function dbfetch_single_value {
+dbexecute "$1" || return 1
+if more_rows_to_read; then 
+  grab_row r || return 1
+fi
+}
+
 # usage: HANDLE={handle} mysql_close
 function mysql_close {
   local handle

@@ -29,9 +29,12 @@ requireVar host_id db_host db_user db_pass || {
   exit 1
 }
 
-# optional variables which may be set in arms_agent.config
-
-# max_processes : maximum number of processes to run at once
+# optional variables which may be set in arms_agent.config, or in environment
+#   max_processes : maximum number of processes to run at once
+#   max_iterations : maximum number of times to pass through the main loop. If this is unset, will run indefinitely.
+#   synchronous : if set, means tasks will be lauched syncronously instead of in the background
+#   min_wait=50 : number of seconds, minimum, to wait between task pickup cycles
+#   max_wait=70 : as above, but for maximum wait
 
 initialize_process_tracking ${max_processes:-4}
 
@@ -63,7 +66,6 @@ while true; do
 
     dbfetch_single_value "select last_insert_id()" || fail
     output_id=$r
-
   fi
   break
 done
@@ -71,74 +73,115 @@ done
 handleReturn
 }
 
-main_loop() {
+record_results_of_completed_process() {
 local returnValue=0
 while true; do
+  cd job_${job_id} || fail
+
+  local job_status=failed
+  [ -f succeeded ] && job_status=succeeded
+
+  insert_into_output_table output || fail
+  local oid=output_id
+  insert_into_output_table error || fail
+  local eid=output_id
+
+  dbexecute "
+    insert into task_status_change set 
+      task_request_id=$(<task_request_id)
+      , output_id=$oid
+      , error_id=$eid
+      , event_time=now()
+      , new_status='done'
+      , result='$job_status'
+    " || (echo "failed to insert task change record."; fail)
+
+  cd .. || fail
+  rm -rf job_${job_id} 
+  break
+done
+handleReturn
+}
+
+fetch_a_task() {
+local returnValue=0
+while true; do
+  dbexecute "
+    select tr.task_request_id, s.content, tr.parameters 
+    from task_request_not_done trnd 
+    inner join task_request tr using (task_request_id)
+    inner join script s using (script_id)
+    left join task_status_change tsc on trnd.task_request_id = tsc.task_request_id
+    where host_id = $host_id
+    and tsc.task_request_id is null
+    limit 1
+    " || (echo "failed to fetch new tasks."; fail)
+  break
+done
+handleReturn
+}
+
+launch_task() {
+local returnValue=0
+while true; do
+  grab_row task_request_id script_content script_parameters || (echo "failed to get row from array."; fail)
+  dbexecute "
+  insert into task_status_change set
+    task_request_id = $task_request_id
+    , event_time = now()
+    , new_status = 'started'
+  " || (echo "failed to update task status."; fail)
+
+  mkdir job_${job_id} || fail
+  cd job_${job_id} || fail
+  echo "$task_request_id" >task_request_id || fail
+  echo "$script_content" >request || fail
+  if [ "$synchronous" ]; then
+    sh request $script_parameters >output 2>error </dev/null
+    record_results_of_completed_process || fail
+  else
+    sh request $script_parameters >output 2>error </dev/null &
+    track_process || fail
+  fi
+  cd .. || fail
+  break
+done
+handleReturn
+}
+
+main_loop() {
+local returnValue=0 iteration=0 short_sleep
+min_wait=${min_wait:-50}
+max_wait=${max_wait:-70}
+while true; do
+  iteration=$((iteration+1))
   while true; do 
     if grab_completed_process; then
-      cd job_${job_id} || fail
-
-      local job_status=failed
-      [ -f succeeded ] && job_status=succeeded
-
-      insert_into_output_table output || fail
-      local oid=output_id
-      insert_into_output_table error || fail
-      local eid=output_id
-
-      dbexecute "
-        insert into task_status_change set 
-          task_request_id=$(<task_request_id)
-          , output_id=$oid
-          , error_id=$eid
-          , event_time=now()
-          , new_status='done'
-          , result='$job_status'
-        " || (echo "failed to insert task change record."; fail)
-
-      cd .. || fail
-      rm -rf job_${job_id} 
-      
+      record_results_of_completed_process || fail
       continue # we need to keep pulling completed processes out until they are gone
     fi
     break
   done
 
   if can_launch_more_processes; then
-    # grab a task to do
-    dbexecute "
-      select tr.task_request_id, s.content, tr.parameters 
-      from task_request_not_done trnd 
-      inner join task_request tr using (task_request_id)
-      inner join script s using (script_id)
-      left join task_status_change tsc on trnd.task_request_id = tsc.task_request_id
-      where host_id = $host_id
-      and tsc.task_request_id is null
-      limit 1
-      " || (echo "failed to fetch new tasks."; fail)
+    fetch_a_task || fail
 
     if more_rows_to_read; then
-      grab_row task_request_id script_content script_parameters || (echo "failed to get row from array."; fail)
-      dbexecute "
-      insert into task_status_change set
-        task_request_id = $task_request_id
-        , event_time = now()
-        , new_status = 'started'
-      " || (echo "failed to update task status."; fail)
-
-      mkdir job_${job_id} || fail
-      cd job_${job_id} || fail
-      echo "$task_request_id" >task_request_id || fail
-      echo "$script_content" >request || fail
-      sh request $script_parameters >output 2>error </dev/null &
-      track_process || fail
-      cd .. || fail
+      launch_task || fail
+      short_sleep=1
     fi
   fi
 
-  # there's nothing to do right now, let's rest a bit before trying again
-  random_sleep 50 70
+  [ "$max_iterations" ] && [[ $iteration >= $max_iterations ]] && break
 
+  # there's nothing to do right now, let's rest a bit before trying again
+  if [ "$short_sleep" ]; then
+    sleep 1
+  else
+    random_sleep $min_wait $max_wait
+  fi
+
+  unset short_sleep
   # loop forever, unless we hit a critical failure
 done
 
