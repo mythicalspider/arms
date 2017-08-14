@@ -8,20 +8,20 @@ local location=$1; shift
 local timeout=${1:-}
 local lockfile=/var/lock/$location
 
-debug_out "Attempting to obtain lock for $location"
+out "Attempting to obtain lock for $location"
 if [ -d $lockfile ]; then
-  debug_out "Lock folder exists already: $lockfile"
+  out "Lock folder exists already: $lockfile"
   pid=$(<$lockfile/pid)
   if [ "$pid" == $$ ]; then
     # this process already owns the lock
-    debug_out "This process already owns the lock, so we are done."
+    out "This process already owns the lock, so we are done."
     return 0
   fi
 
   # check to see if the process is still running
   if [ ! "$pid" ] || ! ps $pid &>/dev/null; then
     rm -rf $lockfile
-    debug_out "Removed stale lockfile: $lockfile with pid: $pid"
+    out "Removed stale lockfile: $lockfile with pid: $pid"
   fi
 fi
 
@@ -38,23 +38,23 @@ while true; do
     break
   fi
 
-  debug_out "Failed to obtain lock. Waiting 5 seconds before trying again."
+  out "Failed to obtain lock. Waiting 5 seconds before trying again."
   sleep 5
   timeleft=$((timeleft-5))
   if [ "$timeleft" -lt 0 ]; then
-    debug_out "Timeout reached. Couldn't obtain the lock in time."
+    out "Timeout reached. Couldn't obtain the lock in time."
     break
   fi
 done
 
 if [ ! "${success:-}" ]; then
   # failed to obtain lock after timeout
-  debug_out "Failed to obtain lock."
+  out "Failed to obtain lock."
   return 1
 fi
 
 # lock obtained
-debug_out "Succeeded in obtaining lock."
+out "Succeeded in obtaining lock."
 return 0
 }
 

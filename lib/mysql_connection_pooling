@@ -68,7 +68,7 @@ function mysql_check {
 # returns $HANDLE
 function mysql_connect {
   local argv argc HANDLEID i
-  debug_out "mysql_connect host=$host db=$db user=$user pass=$pass"
+  out "mysql_connect host=$host db=$db user=$user pass=$pass"
   try
     #prepare args
     argv=($*)

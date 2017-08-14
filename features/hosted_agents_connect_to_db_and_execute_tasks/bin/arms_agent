@@ -12,7 +12,7 @@ done
 lock arms || { echo "arms agent is already running"; exit 1; }
 
 dbexecute() {
-debug_out "dbexecute $1"
+out "dbexecute $1"
 mysql_query "$1" || return 1
 }
 
@@ -45,7 +45,7 @@ establish_connection() {
   host=$db_host db=$db_name user=$db_user pass=$db_pass mysql_connect || return 1
 }
 
-debug_out "Establishing db connection..."
+out "Establishing db connection..."
 establish_connection || exit 1
 
 # usage: insert_into_output_table {file_name containing content}
@@ -56,7 +56,7 @@ insert_into_output_table() {
 local file_name=$1
 local content id
 unset output_id
-debug_out "insert_into_output_table $file_name"
+out "insert_into_output_table $file_name"
 try
   if [ -f $file_name ]; then
     eval "content=\$(<$file_name)"
@@ -77,7 +77,7 @@ handle_return
 }
 
 record_results_of_completed_process() {
-debug_out "record_results_of_completed_process job_id=$job_id"
+out "record_results_of_completed_process job_id=$job_id"
 try
   cd job_${job_id} || fail
 
@@ -106,7 +106,7 @@ handle_return
 }
 
 fetch_a_task() {
-debug_out "fetch_a_task"
+out "fetch_a_task"
 try
   dbexecute "
     select tr.task_request_id, s.content, tr.parameters 
@@ -123,7 +123,7 @@ handle_return
 }
 
 launch_task() {
-debug_out "launch_task job_id=$job_id task_request_id=$task_request_id"
+out "launch_task job_id=$job_id task_request_id=$task_request_id"
 try
   grab_row task_request_id script_content script_parameters || { echo "failed to get row from array."; fail }
   dbexecute "
@@ -153,11 +153,11 @@ main_loop() {
 local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
-debug_out "main_loop()"
+out "main_loop()"
 try
   while true; do 
     if grab_completed_process; then
-      debug_out "Found a completed process" 
+      out "Found a completed process" 
       record_results_of_completed_process || fail
       continue # we need to keep pulling completed processes out until they are gone
     fi
@@ -179,10 +179,10 @@ try
   # there's nothing to do right now, let's rest a bit before trying again
   if [[ $max_wait > 0 ]]; then
     if [ "$short_sleep" ]; then
-      debug_out "sleeping 1 second..."
+      out "sleeping 1 second..."
       sleep 1
     else
-      debug_out "sleeping between $min_wait and $max_wait seconds"
+      out "sleeping between $min_wait and $max_wait seconds"
       random_sleep $min_wait $max_wait
     fi
   fi 
