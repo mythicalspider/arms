@@ -38,7 +38,9 @@ verify_dependencies() {
   fi
 }
 
-source lib/*
+for file in $(find lib -mindepth 1 -maxdepth 1 -not -name ".*" -type f); do
+  source $file || exit 1
+done
 
 unset standard_convention
 standard_convention() {
@@ -49,10 +51,13 @@ standard_convention() {
     cat init_db.sql.template | hydrate_template >>$build_folder/init_db.sql || return 1
   fi
   if [ -d tests ]; then
-    rcpx tests/ $build_folder/tests/ >/dev/null || return 1
+    rcp tests/ $build_folder/tests/ >/dev/null || return 1
   fi
   if [ -d bin ]; then
-    rcpx bin/ $build_folder/bin/ >/dev/null || return 1
+    rcp bin/ $build_folder/bin/ >/dev/null || return 1
+  fi
+  if [ -d lib ]; then
+    rcp lib/ $build_folder/lib/ >/dev/null || return 1
   fi
 }
 

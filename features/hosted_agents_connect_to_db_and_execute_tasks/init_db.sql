@@ -44,7 +44,6 @@ create table if not exists task_status_change (
   , new_status enum('started', 'done') not null
   , result enum('succeeded', 'failed') default null comment 'null if the result has not been determined yet'
   , foreign key (task_request_id) references task_request(task_request_id) on update cascade on delete cascade
-  , foreign key (host_id) references host(host_id) on update cascade on delete cascade
   , foreign key (output_id) references output(output_id) on update cascade on delete set null
   , foreign key (error_id) references output(output_id) on update cascade on delete set null
 );

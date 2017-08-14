@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# setup used by most other script libraries in lib folder
+
+shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
+set -u                    # error when a script attempts to use an unset variable
+
+# debugging
+alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && echo'
+alias err='echo >&2 '
+
+# exception handling
+# usage example:
+#   function do_stuff() {
+#     try
+#       open_connection || fail
+#       for ((i = 0; i < 10; i++)); do 
+#         stuff || fail
+#       done
+#       maybe_break
+#      
+#       more_stuff
+#     end_try
+#     close_connection
+#     handle_return
+#   }
+
+# only run this once within a function definition
+alias try='[ "${debug:-}" ] && debug=$((debug-1)); local return_value=0; while true; do'
+alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1))'
+alias fail='{ returnValue=1; break; }'
+# should be placed after any loop inside of an exception catching block
+alias maybe_break='[ $returnValue == 0 ] || break;'
+alias handle_return='return $return_value'
+
+true                      # make sure we return successfully so calling script can properly move forward
+

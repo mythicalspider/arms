@@ -1,57 +1,67 @@
 #!/bin/bash
 
-while true; do
-  returnValue=0
+run_test() {
+try
+  debug_out "Setting up test data..."
+  cat <<-EOF | dbexecute $central_db_name || fail
+    insert into host set
+      host_id = 1
+      , name = 'test_host'
+      , primary_ip = ''
+      ;
 
-  cat <<EOF | dbexecute $central_db_name || fail
-insert into host set
-  host_id = 1
-  , name = 'test_host'
-  , primary_ip = ''
-  ;
+    insert into script set
+      script_id = 1
+      , name = 'test_script'
+      , version = 1
+      , parameters = ''
+      , content = 'echo success'
+      ;
 
-insert into script set
-  script_id = 1
-  , name = 'test_script'
-  , version = 1
-  , parameters = ''
-  , content = 'echo success'
-  ;
-
-insert into task_request set 
-  task_request_id = 1
-  , host_id = 1
-  , script_id = 1
-  , parameters = ''
-  ;
+    insert into task_request set 
+      task_request_id = 1
+      , host_id = 1
+      , script_id = 1
+      , parameters = ''
+      ;
 EOF
 
   cd $build_folder || fail
 
-  cat <<EOF >arms_agent.config || fail
-db_host=127.0.0.1
-db_user=agent
-db_pass=insecure
-host_id=1
+  debug_out "Creating arms_agent.config"
+  cat <<-EOF >arms_agent.config || fail
+    db_host=127.0.0.1
+    db_name=$central_db_name
+    db_user=agent
+    db_pass=insecure
+    host_id=1
+    max_iterations=2
+    synchronous=1
+    min_wait=0
+    max_wait=0
 EOF
 
-  bin/arms_agent || fail
+  debug_out "Executing arms_agent"
+  debug=9 bin/arms_agent || fail
 
-  [ $(echo "select count(*) from task_status_change 
-            where host_id=1 and new_status='started' and task_request_id=1" | dbexecute $central_db_name) == 1 ] || {
+  debug_out "Checking results in db..."
+  [[ $(echo "select count(*) from task_status_change 
+            where new_status='started' and task_request_id=1" | dbexecute $central_db_name) == 1 ]] || {
       echo "Missing proper 'started' task_status_change record"
       fail
      }
-  [ $(echo "select count(*) from task_status_change 
-            where host_id=1 and new_status='done' and task_request_id=1 and result='succeeded'" | dbexecute $central_db_name) == 1 ] || {
+  [[ $(echo "select count(*) from task_status_change 
+            where new_status='done' and task_request_id=1 and result='succeeded'" | dbexecute $central_db_name) == 1 ]] || {
       echo "Missing proper 'done' task_status_change record"
       fail
      }
 
   cd $OLDPWD || fail
 
-  break
-done
+end_try
 
-handleReturn
+handle_return
+}
+
+debug=1 run_test
 

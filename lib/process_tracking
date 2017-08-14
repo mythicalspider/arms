@@ -12,7 +12,6 @@
 #     track_process
 #   fi
 #
-# requires: process_info
 
 # set up the process tracking pool
 # usage: initialize_process_tracking {max num of processes}
@@ -29,9 +28,9 @@ can_launch_more_processes() {
   local j
   # free up worker slots if jobs are done
   for ((i=0; i<max_tracked_processes; i++)); do
-    j=${process_pool[$i]}
-    if [ "$j" ]; then
-      if is_still_running $j; then
+    j=${process_pool[$i]:-}
+    if [ "${j:-}" ]; then
+      if ps $j &>/dev/null; then
         continue
       else
         process_pool[$i]=
@@ -40,7 +39,7 @@ can_launch_more_processes() {
     job_id=$i
   done
 
-  [ ! "$job_id" ] && return 1
+  [ ! "${job_id:-}" ] && return 1
 }
 
 # returns true (rc=0) if there is at least one completed process to be removed from the pool
@@ -53,9 +52,9 @@ grab_completed_process() {
   local j
   # free up worker slots if jobs are done
   for ((i=0; i<max_tracked_processes; i++)); do
-    j=${process_pool[$i]}
-    if [ "$j" ]; then
-      if is_still_running $j; then
+    j=${process_pool[$i]:-}
+    if [ "${j:-}" ]; then
+      if ps $j &>/dev/null; then
         continue
       else
         job_pid=${process[$i]}
@@ -65,7 +64,7 @@ grab_completed_process() {
     fi
   done
 
-  [ ! "$job_id" ] && return 1
+  [ ! "${job_id:-}" ] && return 1
 }
 
 # intended to be run immediately after launching a background process (which sets $!), 

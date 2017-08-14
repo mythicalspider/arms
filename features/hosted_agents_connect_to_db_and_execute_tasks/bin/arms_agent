@@ -1,20 +1,18 @@
 #!/bin/bash
 
 if [ ! -d lib ]; then
-  echo "Missing lib folder. Make sure you run this script from the directory where it is, and that the lib folder is there with the required scripts."
+  echo "Missing lib folder. Make sure you run this script a place with the lib folder and arms_agent.config"
   exit 1
 fi
 
-agent_tmp=/tmp/arms_agent
-rm -rf $agent_tmp &>/dev/null
-mkdir $agent_tmp || exit 1
-cd $agent_tmp || exit 1
+for file in $(find lib -mindepth 1 -maxdepth 1 -not -name ".*" -type f); do
+  source $file || exit 1
+done
 
-source lib/* || exit 1
-
-lock arms &>/dev/null || (echo "arms agent is already running"; exit 1)
+lock arms || { echo "arms agent is already running"; exit 1; }
 
 dbexecute() {
+debug_out "dbexecute $1"
 mysql_query "$1" || return 1
 }
 
@@ -24,10 +22,15 @@ if [ ! -f arms_agent.config ]; then
 fi
 
 source arms_agent.config
-requireVar host_id db_host db_user db_pass || {
+requireVar host_id db_host db_name db_user db_pass || {
   echo "Make sure that you have defined this variable in your arms_agent.config file"
   exit 1
 }
+
+agent_tmp=/tmp/arms_agent
+rm -rf $agent_tmp &>/dev/null
+mkdir $agent_tmp || exit 1
+cd $agent_tmp || exit 1
 
 # optional variables which may be set in arms_agent.config, or in environment
 #   max_processes : maximum number of processes to run at once
@@ -39,10 +42,11 @@ requireVar host_id db_host db_user db_pass || {
 initialize_process_tracking ${max_processes:-4}
 
 establish_connection() {
-  host=$db_host user=$db_user pass=$db_pass mysql_connect || return 1
+  host=$db_host db=$db_name user=$db_user pass=$db_pass mysql_connect || return 1
 }
 
-establish_connection
+debug_out "Establishing db connection..."
+establish_connection || exit 1
 
 # usage: insert_into_output_table {file_name containing content}
 # if file doesn't exist, returns true but no output_id
@@ -51,9 +55,9 @@ establish_connection
 insert_into_output_table() {
 local file_name=$1
 local content id
-local returnValue=0
 unset output_id
-while true; do
+debug_out "insert_into_output_table $file_name"
+try
   if [ -f $file_name ]; then
     eval "content=\$(<$file_name)"
     content=${content//'/\\'}
@@ -62,20 +66,19 @@ while true; do
       insert into output set
         creation_time=now()
         , content='$content'
-      " || (echo "couldn't insert record into output table."; fail)
+      " || { echo "couldn't insert record into output table."; fail }
 
     dbfetch_single_value "select last_insert_id()" || fail
     output_id=$r
   fi
-  break
-done
+end_try
 
-handleReturn
+handle_return
 }
 
 record_results_of_completed_process() {
-local returnValue=0
-while true; do
+debug_out "record_results_of_completed_process job_id=$job_id"
+try
   cd job_${job_id} || fail
 
   local job_status=failed
@@ -94,18 +97,17 @@ while true; do
       , event_time=now()
       , new_status='done'
       , result='$job_status'
-    " || (echo "failed to insert task change record."; fail)
+    " || { echo "failed to insert task change record."; fail }
 
   cd .. || fail
   rm -rf job_${job_id} 
-  break
-done
-handleReturn
+end_try
+handle_return
 }
 
 fetch_a_task() {
-local returnValue=0
-while true; do
+debug_out "fetch_a_task"
+try
   dbexecute "
     select tr.task_request_id, s.content, tr.parameters 
     from task_request_not_done trnd 
@@ -115,22 +117,21 @@ while true; do
     where host_id = $host_id
     and tsc.task_request_id is null
     limit 1
-    " || (echo "failed to fetch new tasks."; fail)
-  break
-done
-handleReturn
+    " || { echo "failed to fetch new tasks."; fail }
+end_try
+handle_return
 }
 
 launch_task() {
-local returnValue=0
-while true; do
-  grab_row task_request_id script_content script_parameters || (echo "failed to get row from array."; fail)
+debug_out "launch_task job_id=$job_id task_request_id=$task_request_id"
+try
+  grab_row task_request_id script_content script_parameters || { echo "failed to get row from array."; fail }
   dbexecute "
   insert into task_status_change set
     task_request_id = $task_request_id
     , event_time = now()
     , new_status = 'started'
-  " || (echo "failed to update task status."; fail)
+  " || { echo "failed to update task status."; fail }
 
   mkdir job_${job_id} || fail
   cd job_${job_id} || fail
@@ -144,19 +145,19 @@ while true; do
     track_process || fail
   fi
   cd .. || fail
-  break
-done
-handleReturn
+end_try
+handle_return
 }
 
 main_loop() {
-local returnValue=0 iteration=0 short_sleep
+local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
-while true; do
-  iteration=$((iteration+1))
+debug_out "main_loop()"
+try
   while true; do 
     if grab_completed_process; then
+      debug_out "Found a completed process" 
       record_results_of_completed_process || fail
       continue # we need to keep pulling completed processes out until they are gone
     fi
@@ -172,20 +173,25 @@ while true; do
     fi
   fi
 
-  [ "$max_iterations" ] && [[ $iteration >= $max_iterations ]] && break
+  iteration=$((iteration+1))
+  [ "$max_iterations" ] && [[ $iteration > $max_iterations ]] && break
 
   # there's nothing to do right now, let's rest a bit before trying again
-  if [ "$short_sleep" ]; then
-    sleep 1
-  else
-    random_sleep $min_wait $max_wait
-  fi
+  if [[ $max_wait > 0 ]]; then
+    if [ "$short_sleep" ]; then
+      debug_out "sleeping 1 second..."
+      sleep 1
+    else
+      debug_out "sleeping between $min_wait and $max_wait seconds"
+      random_sleep $min_wait $max_wait
+    fi
+  fi 
 
   unset short_sleep
   # loop forever, unless we hit a critical failure
-done
-
-handleReturn
+  continue
+end_try
+handle_return
 }
 
 main_loop || exit 1

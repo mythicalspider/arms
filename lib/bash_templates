@@ -2,7 +2,6 @@
 
 # usage: cat file | hydrate_template >output
 #   will replace bash variables and expressions
-unset hydrate_template
 hydrate_template() {
 local returnValue=0
 local OIFS="$IFS"

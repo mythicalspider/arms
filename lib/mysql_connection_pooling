@@ -68,32 +68,36 @@ function mysql_check {
 # returns $HANDLE
 function mysql_connect {
   local argv argc HANDLEID i
-  #prepare args
-  argv=($*)
-  argc=${#argv[*]}
+  debug_out "mysql_connect host=$host db=$db user=$user pass=$pass"
+  try
+    #prepare args
+    argv=($*)
+    argc=${#argv[*]}
 
-  host="${host:-localhost}"
-  if [ "$pass" ]; then
-    pass="-p $pass"
-  fi
+    host="${host:-localhost}"
+    if [ "$pass" ]; then
+      pass="-p$pass"
+    fi
 
-  if [[ ${#user} -lt 1 || ${#db} -lt 1 ]]; then
-    echo "ERROR: Options -u user and -d db are required!"
-    return 1;
-  fi
+    if [[ ${#user} < 1 || ${#db} < 1 ]]; then
+      echo "ERROR: Options user and db are required!"
+      fail
+    fi
 
-  # init connection and channels
-  # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
-  HANDLEID="MYSQL$RANDOM"
-  eval "coproc $HANDLEID { stdbuf -oL mysql -u $user $pass -h $host -D $db --force --unbuffered --xml -vvv 2>&1; }" 2> /dev/null
-  HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
-  if mysql_check $HANDLE; then
-    export HANDLE
-    return 0
-  else
-    echo "ERROR: Connection failed to $user@$host->DB:$db!"
-    return 1
-  fi
+    # init connection and channels
+    # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
+    HANDLEID="MYSQL$RANDOM"
+    eval "coproc $HANDLEID { stdbuf -oL mysql -u $user $pass -h $host -D $db --force --unbuffered --xml -vvv 2>&1; }" 2> /dev/null
+    HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
+    if mysql_check $HANDLE; then
+      export HANDLE
+      return 0
+    else
+      echo "ERROR: Connection failed to $user@$host->DB:$db!"
+      fail
+    fi
+  end_try
+  handle_return
 }
 
 # usage: HANDLE={handle} mysql_query {query}
@@ -103,78 +107,80 @@ function mysql_connect {
 #         $DATA[4] = key2; DATA[5] = val2 (depending on number of columns, rows)
 function mysql_query {
   local handle query affected line results_open row_open cols key val
-  if ! mysql_check $HANDLE; then
-    echo "ERROR: Connection not open!"
-    return 1
-  fi
-  handle=(${HANDLE//_/ })
-
-  # use this to keep track of where you are when reading this data
-  export current_row=0
-
-  # delimit query; otherwise we block forever/timeout
-  query=$2
-  if [[ ! "$query" =~ \;\$ ]]; then
-    query="$query;"
-  fi
-  #send query
-  echo "$query" >&${handle[1]}
-
-  #get output
-  DATA=();
-  DATA[0]=0
-  DATA[1]=0
-  results_open=0
-  row_open=0
-  cols=0
-  while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
-  do
-    # WAS ERROR?
-    if [[ "$line" == *"ERROR"* ]]; then
-      echo "$line"
+  try
+    if ! mysql_check $HANDLE; then
+      echo "ERROR: Connection not open!"
       return 1
-    # WAS INSERT/UPDATE?
-    elif [[ "$line" == *"Query OK"* ]]; then
-      affected=$([[ "$line" =~ Query\ OK\,\ ([0-9]+)\ rows?\ affected ]] && echo ${BASH_REMATCH[1]})
-      DATA[0]=$affected
-      export DATA
-      return 0
     fi
+    handle=(${HANDLE//_/ })
 
-    # BEGIN FETCHING RESULTS
-    if [[ $line =~ \<resultset ]]; then
-      results_open=1
+    # use this to keep track of where you are when reading this data
+    export current_row=0
+
+    # delimit query; otherwise we block forever/timeout
+    query=$2
+    if [[ ! "$query" =~ \;\$ ]]; then
+      query="$query;"
     fi
+    #send query
+    echo "$query" >&${handle[1]}
 
-    #RESULTS
-    if [[ $results_open == 1 ]]; then
-      if [[ $line =~ \<row ]]; then
-        row_open=1
-        cols=0
-      elif [[ $line =~ \<field && $row_open == 1 ]]; then
-        key=$([[ "$line" =~ name\=\"([^\"]+)\" ]] && echo ${BASH_REMATCH[1]})
-        val=$([[ "$line" =~ \>(.*)\<\/ ]] && echo ${BASH_REMATCH[1]} || echo "NULL")
-        DATA[${#DATA[*]}]=$key
-        DATA[${#DATA[*]}]=$val
-        cols=$[$cols+1]
-      elif [[ $line =~ \<\/row ]]; then
-        row_open=0
-        DATA[0]=$[${DATA[0]}+1]
-        DATA[1]=$cols
-        column_count=$cols
+    #get output
+    DATA=();
+    DATA[0]=0
+    DATA[1]=0
+    results_open=0
+    row_open=0
+    cols=0
+    while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
+    do
+      # WAS ERROR?
+      if [[ "$line" == *"ERROR"* ]]; then
+        echo "$line"
+        return 1
+      # WAS INSERT/UPDATE?
+      elif [[ "$line" == *"Query OK"* ]]; then
+        affected=$([[ "$line" =~ Query\ OK\,\ ([0-9]+)\ rows?\ affected ]] && echo ${BASH_REMATCH[1]})
+        DATA[0]=$affected
+        export DATA
+        return 0
       fi
-    fi
 
-    #END OF RESULTS
-    if [[ $line =~ \<\/resultset ]]; then
-      export DATA
-      return 0
-    fi
-  done
-  #we can only get here
-  #if read times out O_o
-  echo "$FUNCNAME: Read timed out!"
-  return 1
+      # BEGIN FETCHING RESULTS
+      if [[ $line =~ \<resultset ]]; then
+        results_open=1
+      fi
+
+      #RESULTS
+      if [[ $results_open == 1 ]]; then
+        if [[ $line =~ \<row ]]; then
+          row_open=1
+          cols=0
+        elif [[ $line =~ \<field && $row_open == 1 ]]; then
+          key=$([[ "$line" =~ name\=\"([^\"]+)\" ]] && echo ${BASH_REMATCH[1]})
+          val=$([[ "$line" =~ \>(.*)\<\/ ]] && echo ${BASH_REMATCH[1]} || echo "NULL")
+          DATA[${#DATA[*]}]=$key
+          DATA[${#DATA[*]}]=$val
+          cols=$[$cols+1]
+        elif [[ $line =~ \<\/row ]]; then
+          row_open=0
+          DATA[0]=$[${DATA[0]}+1]
+          DATA[1]=$cols
+          column_count=$cols
+        fi
+      fi
+
+      #END OF RESULTS
+      if [[ $line =~ \<\/resultset ]]; then
+        export DATA
+        return 0
+      fi
+    done
+    #we can only get here
+    #if read times out O_o
+    echo "$FUNCNAME: Read timed out!"
+  end_try
+  handle_return # was return 1
 }
 
 # returns true if the previous mysql_query command returned 1 or more rows
