@@ -6,13 +6,12 @@
 shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
 set -u                    # error when a script attempts to use an unset variable
 
-# debugging
 alias err='echo >&2 '
 # indentation style
 #alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf %${indent}s && echo'
 # debug level style
-alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf "[$debug] " && echo'
-alias out_short='[ "${debug:-}" ] && [ $debug -gt 0 ] && echo'
+alias out='[ $debug -gt 0 ] && printf "[$debug] " && echo'
+alias out_short='[ $debug -gt 0 ] && echo'
 
 # exception handling
 # usage example:
@@ -31,6 +30,7 @@ alias out_short='[ "${debug:-}" ] && [ $debug -gt 0 ] && echo'
 #   }
 
 indent=0
+debug=${debug:-1}
 # only run this once within a function definition
 alias try='indent=$((indent+1)); [ "${debug:-}" ] && debug=$((debug-1)); local return_value=0; while true; do'
 alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1)); indent=$((indent-1))'

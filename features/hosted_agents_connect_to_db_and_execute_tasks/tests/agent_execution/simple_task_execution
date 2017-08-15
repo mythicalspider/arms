@@ -15,7 +15,7 @@ try
       , name = 'test_script'
       , version = 1
       , parameters = ''
-      , content = 'echo success'
+      , content = 'echo success; touch succeeded'
       ;
 
     insert into task_request set 

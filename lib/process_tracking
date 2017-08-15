@@ -24,9 +24,10 @@ initialize_process_tracking() {
 # returns true (rc=0) if there is room for more processes in the tracking pool
 #   sets job_id = slot id of the first free slot
 can_launch_more_processes() {
-  out "can_launch_more_processes max_tracked_processes=$max_tracked_processes"
-  unset job_id
-  local j
+out "can_launch_more_processes max_tracked_processes=$max_tracked_processes"
+unset job_id
+local j
+try
   # free up worker slots if jobs are done
   for ((i=0; i<max_tracked_processes; i++)); do
     out "checking out slot $i"
@@ -46,10 +47,11 @@ can_launch_more_processes() {
     job_id=$i
     break
   done
+end_try
 
-  [ ! "${job_id:-}" ] && return 1
-  out "slot found: job_id=$job_id"
-  return 0
+[ ! "${job_id:-}" ] && return 1
+out "slot found: job_id=$job_id"
+return 0
 }
 
 # returns true (rc=0) if there is at least one completed process to be removed from the pool

@@ -35,6 +35,17 @@ create table if not exists task_request_not_done (
   , foreign key (task_request_id) references task_request(task_request_id) on update cascade on delete cascade
 );
 
+delimiter $$
+create trigger if not exists after_task_request 
+  after insert on task_request 
+  for each row begin
+    insert into task_request_not_done set
+      task_request_id=NEW.task_request_id
+    ;
+  end
+$$
+delimiter ;
+
 create table if not exists task_status_change (
   task_status_change_id int auto_increment not null primary key
   , task_request_id int not null

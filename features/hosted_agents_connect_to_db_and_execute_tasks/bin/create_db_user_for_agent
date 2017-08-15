@@ -26,7 +26,7 @@ agent_user=agent_${agent_host_id}
 out "Creating user $agent_user..."
 try
   cat <<EOF | dbexecute || exit 1
-    create user if not exists ${agent_user} identified by '${agent_pass}';
+    create user if not exists ${agent_user}@'localhost' identified by '${agent_pass}';
     grant insert on ${db_name}.output to '${agent_user}';
     grant insert on ${db_name}.task_status_change to '${agent_user}';
     grant select on ${db_name}.task_request_not_done to '${agent_user}';
