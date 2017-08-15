@@ -13,7 +13,6 @@ done
 lock arms || { err "arms agent is already running"; exit 1; }
 
 dbexecute() {
-out "dbexecute $1"
 mysql_query "$1" || return 1
 }
 

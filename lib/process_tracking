@@ -48,6 +48,8 @@ can_launch_more_processes() {
   done
 
   [ ! "${job_id:-}" ] && return 1
+  out "slot found: job_id=$job_id"
+  return 0
 }
 
 # returns true (rc=0) if there is at least one completed process to be removed from the pool

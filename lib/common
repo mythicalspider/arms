@@ -43,5 +43,8 @@ alias maybe_break='[ $return_value == 0 ] || break;'
 # should be at the end of every function which contains a try / end_try block
 alias handle_return='return $return_value'
 
+# newline
+newline=$'\n'
+
 true                      # make sure we return successfully so calling script can properly move forward
 

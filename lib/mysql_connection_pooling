@@ -87,17 +87,27 @@ function mysql_connect {
     # init connection and channels
     # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
     HANDLEID="MYSQL$RANDOM"
-    eval "coproc $HANDLEID { stdbuf -oL mysql -u $user $pass -h $host -D $db --force --unbuffered --xml -vvv 2>&1; }" 2> /dev/null
+    eval "coproc $HANDLEID { stdbuf -oL mysql -u $user $pass -h $host -D $db --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
     HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
+    mysql_capture_output 
     if mysql_check $HANDLE; then
       export HANDLE
       break
     else
       err "ERROR: Connection failed to $user@$host->DB:$db!"
+      echo "$output"
       fail
     fi
   end_try
   handle_return
+}
+
+function mysql_capture_output {
+local handle=(${HANDLE//_/ }) line
+output=""
+while read -t 1 -ru ${handle[0]} line; do
+  output="$output$newline$line"
+done
 }
 
 # usage: HANDLE={handle} mysql_query {query}
@@ -108,7 +118,7 @@ function mysql_connect {
 function mysql_query {
   local handle query affected line results_open row_open cols key val timed_out
   query=$1
-  out "mysql_query ${query:0:40}"
+  out "mysql_query ${query}"
   try
     if ! mysql_check $HANDLE; then
       err "ERROR: Connection not open!"
