@@ -1,28 +1,30 @@
 #!/bin/bash
 
-echo "Running tests..."
+out "Running tests..."
 
 test_result_path=$build_folder/test_results
 rm $test_result_path &>/dev/null
 
 unset executeTests
 executeTests() {
-  local path="$1" file dir returnValue=0
-  for file in $(find $path -mindepth 1 -maxdepth 1 -type f -printf "%f\n" | sort); do
-    echo -n "$file: "
-    source $path/$file &>>$test_result_path || {
-      echo "${RED}[Failed]${RESET}"
-      cat $test_result_path
-      fail
-    }
-    echo "${GREEN}[Success]${RESET}"
-  done
-  
-  for dir in $(find $path -mindepth 1 -maxdepth 1 -type d | sort); do
-    executeTests "$dir" || fail
-  done
+  local path="$1" file dir
+  try
+    for file in $(find $path -mindepth 1 -maxdepth 1 -type f -printf "%f\n" | sort); do
+      out -n "$file: "
+      source $path/$file &>>$test_result_path || {
+        out_short "${RED}[Failed]${RESET}"
+        cat $test_result_path
+        fail
+      }
+      out_short "${GREEN}[Success]${RESET}"
+    done; maybe_break
+    
+    for dir in $(find $path -mindepth 1 -maxdepth 1 -type d | sort); do
+      executeTests "$dir" || fail
+    done; maybe_break
+  end_try
 
-  return $returnValue
+  handle_return
 }
 
 executeTests $build_folder/tests || exit 1

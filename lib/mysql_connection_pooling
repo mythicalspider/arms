@@ -80,7 +80,7 @@ function mysql_connect {
     fi
 
     if [[ ${#user} < 1 || ${#db} < 1 ]]; then
-      echo "ERROR: Options user and db are required!"
+      err "ERROR: Options user and db are required!"
       fail
     fi
 
@@ -91,9 +91,9 @@ function mysql_connect {
     HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
     if mysql_check $HANDLE; then
       export HANDLE
-      return 0
+      break
     else
-      echo "ERROR: Connection failed to $user@$host->DB:$db!"
+      err "ERROR: Connection failed to $user@$host->DB:$db!"
       fail
     fi
   end_try
@@ -106,10 +106,12 @@ function mysql_connect {
 #         $DATA[2] = key1; DATA[3] = val1
 #         $DATA[4] = key2; DATA[5] = val2 (depending on number of columns, rows)
 function mysql_query {
-  local handle query affected line results_open row_open cols key val
+  local handle query affected line results_open row_open cols key val timed_out
+  query=$1
+  out "mysql_query ${query:0:40}"
   try
     if ! mysql_check $HANDLE; then
-      echo "ERROR: Connection not open!"
+      err "ERROR: Connection not open!"
       return 1
     fi
     handle=(${HANDLE//_/ })
@@ -118,7 +120,6 @@ function mysql_query {
     export current_row=0
 
     # delimit query; otherwise we block forever/timeout
-    query=$2
     if [[ ! "$query" =~ \;\$ ]]; then
       query="$query;"
     fi
@@ -136,14 +137,14 @@ function mysql_query {
     do
       # WAS ERROR?
       if [[ "$line" == *"ERROR"* ]]; then
-        echo "$line"
-        return 1
+        err "$line"
+        fail
       # WAS INSERT/UPDATE?
       elif [[ "$line" == *"Query OK"* ]]; then
         affected=$([[ "$line" =~ Query\ OK\,\ ([0-9]+)\ rows?\ affected ]] && echo ${BASH_REMATCH[1]})
         DATA[0]=$affected
         export DATA
-        return 0
+        break
       fi
 
       # BEGIN FETCHING RESULTS
@@ -173,21 +174,20 @@ function mysql_query {
       #END OF RESULTS
       if [[ $line =~ \<\/resultset ]]; then
         export DATA
-        return 0
+        break
       fi
     done
-    #we can only get here
-    #if read times out O_o
-    echo "$FUNCNAME: Read timed out!"
+    [[ $? > 0 ]] && [[ return_value == 0 ]] && {
+      err "$FUNCNAME: Read timed out!"
+      fail
+    }
+    maybe_break
   end_try
-  handle_return # was return 1
+  handle_return
 }
 
 # returns true if the previous mysql_query command returned 1 or more rows
 function more_rows_to_read {
-  if [ ! "${DATA:-}" ]; then
-    return 1
-  fi
   if [[ ${DATA[0]} > $current_row ]]; then
     return 0
   fi
@@ -223,7 +223,7 @@ fi
 function mysql_close {
   local handle
   if ! mysql_check $1; then
-    echo "ERROR: Connection not open!"
+    err "ERROR: Connection not open!"
     return 1
   fi
   handle=(${1//_/ })
@@ -232,7 +232,7 @@ function mysql_close {
   if ! mysql_check $1; then
     return 0
   else
-    echo "ERROR: Couldn't close connection!"
+    err "ERROR: Couldn't close connection!"
     return 1
   fi
 }

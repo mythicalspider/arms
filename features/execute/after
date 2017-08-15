@@ -1,5 +1,5 @@
 #!/bin/bash
 
-echo "Applying database changes..."
+out "Applying database changes..."
 cat $build_folder/init_db.sql | dbexecute || exit 1
 

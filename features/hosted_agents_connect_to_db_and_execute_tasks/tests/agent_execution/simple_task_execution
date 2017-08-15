@@ -47,21 +47,20 @@ EOF
   out "Checking results in db..."
   [[ $(echo "select count(*) from task_status_change 
             where new_status='started' and task_request_id=1" | dbexecute $central_db_name) == 1 ]] || {
-      echo "Missing proper 'started' task_status_change record"
+      err "Missing proper 'started' task_status_change record"
       fail
      }
   [[ $(echo "select count(*) from task_status_change 
             where new_status='done' and task_request_id=1 and result='succeeded'" | dbexecute $central_db_name) == 1 ]] || {
-      echo "Missing proper 'done' task_status_change record"
+      err "Missing proper 'done' task_status_change record"
       fail
      }
 
   cd $OLDPWD || fail
 
 end_try
-
 handle_return
 }
 
-debug=1 run_test
+debug=2 run_test || return 1
 

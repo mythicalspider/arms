@@ -1,4 +1,4 @@
 #!/bin/bash
 
-echo "Build scripts created in: $build_folder"
+out "Build scripts created in: $build_folder"
 

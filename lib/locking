@@ -62,7 +62,7 @@ return 0
 unlock() {
 local location=$1
 if [ ! "$location" ]; then
-  echo "Usage: unlock {lock name}"
+  err "Usage: unlock {lock name}"
   return 1
 fi
 

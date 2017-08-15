@@ -1,13 +1,18 @@
 #!/bin/bash
 
 # setup used by most other script libraries in lib folder
+# soure this before other libraries
 
 shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
 set -u                    # error when a script attempts to use an unset variable
 
 # debugging
-alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && echo'
 alias err='echo >&2 '
+# indentation style
+#alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf %${indent}s && echo'
+# debug level style
+alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf "[$debug] " && echo'
+alias out_short='[ "${debug:-}" ] && [ $debug -gt 0 ] && echo'
 
 # exception handling
 # usage example:
@@ -25,12 +30,17 @@ alias err='echo >&2 '
 #     handle_return
 #   }
 
+indent=0
 # only run this once within a function definition
-alias try='[ "${debug:-}" ] && debug=$((debug-1)); local return_value=0; while true; do'
-alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1))'
-alias fail='{ returnValue=1; break; }'
+alias try='indent=$((indent+1)); [ "${debug:-}" ] && debug=$((debug-1)); local return_value=0; while true; do'
+alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1)); indent=$((indent-1))'
+
+alias fail='{ return_value=1; break; }'
+
 # should be placed after any loop inside of an exception catching block
-alias maybe_break='[ $returnValue == 0 ] || break;'
+alias maybe_break='[ $return_value == 0 ] || break;'
+
+# should be at the end of every function which contains a try / end_try block
 alias handle_return='return $return_value'
 
 true                      # make sure we return successfully so calling script can properly move forward

@@ -1,5 +1,7 @@
+#!/bin/bash
+
 if [ ! "$build_folder" ]; then
-  echo "build_folder not set"
+  err "build_folder not set"
   exit 1
 fi
 

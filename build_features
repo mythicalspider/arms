@@ -3,12 +3,13 @@
 # error out if we try to use an unset variable
 set -u
 
+debug=${debug:-1}
 featureset="${1:-}"
 
 if [ ! "$featureset" ]; then
-  echo "Usage: $0 {featureset}"
-  echo " from the folder containing a features and feature_sets folders"
-  echo "current featuresets: $(find feature_sets -mindepth 1 -maxdepth 1 -not -name '.*' -type f -printf "%f ")"
+  err "Usage: $0 {featureset}"
+  err " from the folder containing a features and feature_sets folders"
+  err "current featuresets: $(find feature_sets -mindepth 1 -maxdepth 1 -not -name '.*' -type f -printf "%f ")"
   exit 1
 fi
 
@@ -31,14 +32,15 @@ verify_dependencies() {
         fi
       done
       if [ ! "$found" ]; then 
-        echo "error: feature [$feature] requires [$dependency] to be present earlier in the featureset"
+        err "error: feature [$feature] requires [$dependency] to be present earlier in the featureset"
         return 1
       fi
     done
   fi
 }
 
-for file in $(find lib -mindepth 1 -maxdepth 1 -not -name ".*" -type f); do
+source lib/common || exit 1
+for file in $(find lib -mindepth 1 -maxdepth 1 -not -name common -not -name ".*" -type f); do
   source $file || exit 1
 done
 
@@ -66,10 +68,10 @@ process_features() {
   local feature features="" fp 
   for feature in $(cat_no_comments feature_sets/$featureset); do
     if [ ! -d features/$feature ]; then
-      echo "error: missing feature: $feature"
+      err "error: missing feature: $feature"
       exit 1
     fi
-    echo "Before feature: $feature"
+    out "Before feature: $feature"
 
     verify_dependencies || exit 1
     fp=features/$feature
@@ -89,7 +91,7 @@ process_features() {
   for feature in "${features[@]}"; do
     fp=features/$feature
     if [ -f "$fp/after" ]; then
-      echo "After feature: $feature"
+      out "After feature: $feature"
       cd $fp || exit 1
       source ./after || exit 1
       cd ../.. || exit 1

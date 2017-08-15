@@ -1,15 +1,16 @@
 #!/bin/bash
 
 if [ ! -d lib ]; then
-  echo "Missing lib folder. Make sure you run this script a place with the lib folder and arms_agent.config"
+  err "Missing lib folder. Make sure you run this script a place with the lib folder and arms_agent.config"
   exit 1
 fi
 
-for file in $(find lib -mindepth 1 -maxdepth 1 -not -name ".*" -type f); do
+source lib/common || exit 1
+for file in $(find lib -mindepth 1 -maxdepth 1 -not -name common -not -name ".*" -type f); do
   source $file || exit 1
 done
 
-lock arms || { echo "arms agent is already running"; exit 1; }
+lock arms || { err "arms agent is already running"; exit 1; }
 
 dbexecute() {
 out "dbexecute $1"
@@ -17,13 +18,13 @@ mysql_query "$1" || return 1
 }
 
 if [ ! -f arms_agent.config ]; then
-  echo "Missing arms_agent.config. It must exist in the current directory."
+  err "Missing arms_agent.config. It must exist in the current directory."
   exit 1
 fi
 
 source arms_agent.config
 requireVar host_id db_host db_name db_user db_pass || {
-  echo "Make sure that you have defined this variable in your arms_agent.config file"
+  err "Make sure that you have defined this variable in your arms_agent.config file"
   exit 1
 }
 
@@ -66,7 +67,7 @@ try
       insert into output set
         creation_time=now()
         , content='$content'
-      " || { echo "couldn't insert record into output table."; fail }
+      " || { err "couldn't insert record into output table."; fail }
 
     dbfetch_single_value "select last_insert_id()" || fail
     output_id=$r
@@ -97,7 +98,7 @@ try
       , event_time=now()
       , new_status='done'
       , result='$job_status'
-    " || { echo "failed to insert task change record."; fail }
+    " || { err "failed to insert task change record."; fail }
 
   cd .. || fail
   rm -rf job_${job_id} 
@@ -117,7 +118,7 @@ try
     where host_id = $host_id
     and tsc.task_request_id is null
     limit 1
-    " || { echo "failed to fetch new tasks."; fail }
+    " || { err "failed to fetch new tasks."; fail }
 end_try
 handle_return
 }
@@ -125,13 +126,13 @@ handle_return
 launch_task() {
 out "launch_task job_id=$job_id task_request_id=$task_request_id"
 try
-  grab_row task_request_id script_content script_parameters || { echo "failed to get row from array."; fail }
+  grab_row task_request_id script_content script_parameters || { err "failed to get row from array."; fail }
   dbexecute "
   insert into task_status_change set
     task_request_id = $task_request_id
     , event_time = now()
     , new_status = 'started'
-  " || { echo "failed to update task status."; fail }
+  " || { err "failed to update task status."; fail }
 
   mkdir job_${job_id} || fail
   cd job_${job_id} || fail
@@ -153,7 +154,7 @@ main_loop() {
 local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
-out "main_loop()"
+out "main_loop"
 try
   while true; do 
     if grab_completed_process; then
@@ -165,16 +166,25 @@ try
   done
 
   if can_launch_more_processes; then
+    out "We have more room for processes"
     fetch_a_task || fail
 
     if more_rows_to_read; then
+      out "Found a task"
       launch_task || fail
       short_sleep=1
+    else
+      out "No tasks to do"
     fi
+  else
+    out "No room for more processes"
   fi
 
   iteration=$((iteration+1))
-  [ "$max_iterations" ] && [[ $iteration > $max_iterations ]] && break
+  [ "$max_iterations" ] && [[ $iteration > $max_iterations ]] && {
+    out "Max iterations reached ($iteration > $max_iterations)"
+    break
+  }
 
   # there's nothing to do right now, let's rest a bit before trying again
   if [[ $max_wait > 0 ]]; then
