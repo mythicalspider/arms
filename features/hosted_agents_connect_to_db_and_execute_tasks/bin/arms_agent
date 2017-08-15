@@ -22,10 +22,12 @@ if [ ! -f arms_agent.config ]; then
 fi
 
 source arms_agent.config
-requireVar host_id db_host db_name db_user db_pass || {
+require_var host_id db_host db_name db_pass || {
   err "Make sure that you have defined this variable in your arms_agent.config file"
   exit 1
 }
+
+db_user=agent_${host_id}
 
 agent_tmp=/tmp/arms_agent
 rm -rf $agent_tmp &>/dev/null

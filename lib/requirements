@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# usage: requireFunction {function(s) to check...}
+# usage: require_function {function(s) to check...}
 # exits if the function doesn't exist
-unset requireFunction
-requireFunction() {
+require_function() {
+local i
 for i ; do
   tempStatus=`type $i >/dev/null 2>&1 && echo true`
   if [ -z "$tempStatus" ]; then
@@ -13,10 +13,10 @@ for i ; do
 done
 }
 
-# usage: requireVar {variable(s) to check...}
+# usage: require_var {variable(s) to check...}
 # exits if the variable doesn't exist
-unset requireVar
-requireVar() {
+require_var() {
+local v i
 for i ; do
   v=`eval echo "$"$i`
   if [ -z "$v" ]; then
@@ -26,6 +26,30 @@ for i ; do
       stackTrace
       return 1
     fi
+  fi
+done
+}
+
+require_var_or_ask() {
+local v new_value var_name="$1"
+shift
+local description="$1"
+
+v=`eval echo "$"$var_name`
+while true; do
+  if [ -z "$v" ]; then
+    v=`eval echo "$"{#$var_name[*]}`
+    if [ "$v" == "0" ]; then
+      read -ep "${description}? ${var_name}=" new_value
+      if [ "$new_value" ]; then
+        eval "var_name=\"${new_value}\""
+        break
+      else
+        echo "You must enter a valid value to continue."
+      fi
+    fi
+  else
+    break
   fi
 done
 }

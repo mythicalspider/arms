@@ -6,7 +6,7 @@
 
 unset dbexecute
 dbexecute() {
-mysql -N -utest -pinsecure "${@:-}" || return 1
+mysql -N -u${db_user} -p${db_pass} -h${db_host} "${@:-}" || return 1
 }
 
 central_db_name=arms

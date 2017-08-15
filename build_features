@@ -6,13 +6,6 @@ set -u
 debug=${debug:-1}
 featureset="${1:-}"
 
-if [ ! "$featureset" ]; then
-  err "Usage: $0 {featureset}"
-  err " from the folder containing a features and feature_sets folders"
-  err "current featuresets: $(find feature_sets -mindepth 1 -maxdepth 1 -not -name '.*' -type f -printf "%f ")"
-  exit 1
-fi
-
 unset cat_no_comments
 cat_no_comments() {
   cat "$@" | grep -v "^ *#"
@@ -44,6 +37,13 @@ for file in $(find lib -mindepth 1 -maxdepth 1 -not -name common -not -name ".*"
   source $file || exit 1
 done
 
+if [ ! "$featureset" ]; then
+  err "Usage: $0 {featureset}"
+  err " from the folder containing a features and feature_sets folders"
+  err "current featuresets: $(find feature_sets -mindepth 1 -maxdepth 1 -not -name '.*' -type f -printf "%f ")"
+  exit 1
+fi
+
 unset standard_convention
 standard_convention() {
   if [ -f init_db.sql ]; then
@@ -65,8 +65,15 @@ standard_convention() {
 
 unset process_features
 process_features() {
-  local feature features="" fp 
-  for feature in $(cat_no_comments feature_sets/$featureset); do
+  local feature feature_line features="" fp field
+  OIFS="$IFS"
+  IFS=$'\n'
+  for feature_line in $(cat_no_comments feature_sets/$featureset); do
+    IFS="$OIFS"
+    feature_line=( $feature_line )
+    feature="${feature_line[0]}"
+    eval "${feature_line[*]:1}"
+
     if [ ! -d features/$feature ]; then
       err "error: missing feature: $feature"
       exit 1

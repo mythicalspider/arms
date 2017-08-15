@@ -32,7 +32,6 @@ EOF
   cat <<-EOF >arms_agent.config || fail
     db_host=127.0.0.1
     db_name=$central_db_name
-    db_user=agent
     db_pass=insecure
     host_id=1
     max_iterations=2
@@ -41,8 +40,11 @@ EOF
     max_wait=0
 EOF
 
+  out "Creating arms agent user for the test host..."
+  db_host=127.0.0.1 db_name=$central_db_name admin_user=test admin_pass=insecure agent_host_id=1 agent_pass=insecure bin/create_db_user_for_agent || fail
+
   out "Executing arms_agent"
-  debug=9 bin/arms_agent || fail
+  bin/arms_agent || fail
 
   out "Checking results in db..."
   [[ $(echo "select count(*) from task_status_change 
@@ -62,5 +64,5 @@ end_try
 handle_return
 }
 
-debug=2 run_test || return 1
+debug=9 run_test || return 1
 
