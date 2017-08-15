@@ -14,22 +14,27 @@ dbexecute() {
 mysql -u$admin_user -p$admin_pass -h$db_host $db_name || return 1
 }
 
+main() {
 require_var_or_ask db_host "host of central db (ip or domain name)"
 require_var_or_ask db_name "name of database"
 require_var_or_ask agent_host_id "agent host id"
 require_var_or_ask agent_pass "password for this agent"
 require_var_or_ask admin_user "admin user name"
 require_var_or_ask admin_pass "admin password"
-
 agent_user=agent_${agent_host_id}
 
-echo <<EOF | dbexecute || exit 1
-  create user if not exists ${agent_user} identified by '${agent_pass}';
-  grant insert on ${db_name}.output to '${agent_user}';
-  grant insert on ${db_name}.task_status_change to '${agent_user}';
-  grant select on ${db_name}.task_request_not_done to '${agent_user}';
-  grant select on ${db_name}.task_request to '${agent_user}';
-  grant select on ${db_name}.script to '${agent_user}';
-  grant select on ${db_name}.task_status_change to '${agent_user}';
+out "Creating user $agent_user..."
+try
+  cat <<EOF | dbexecute || exit 1
+    create user if not exists ${agent_user} identified by '${agent_pass}';
+    grant insert on ${db_name}.output to '${agent_user}';
+    grant insert on ${db_name}.task_status_change to '${agent_user}';
+    grant select on ${db_name}.task_request_not_done to '${agent_user}';
+    grant select on ${db_name}.task_request to '${agent_user}';
+    grant select on ${db_name}.script to '${agent_user}';
+    grant select on ${db_name}.task_status_change to '${agent_user}';
 EOF
+end_try
+}
 
+main 
