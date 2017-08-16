@@ -53,7 +53,7 @@ export MYSQL_READ_TIMEOUT=10
 
 # usage: HANDLE={connection handle} mysql_check 
 function mysql_check {
-  dive
+  local_dive
   out "mysql_check"
   try
     local handle
@@ -82,7 +82,7 @@ function mysql_check {
 # returns $HANDLE
 function mysql_connect {
   local argv argc HANDLEID i
-  dive
+  local_dive
   out "mysql_connect host=${host:-} db=${db:-} user=${user:-} pass=${pass:-}"
   try
     #prepare args
@@ -137,7 +137,7 @@ done
 function mysql_query {
   local handle query affected line results_open row_open cols key val timed_out
   query=$1
-  dive
+  local_dive
   out "mysql_query\n${query}"
   try
     handle=(${HANDLE//_/ })

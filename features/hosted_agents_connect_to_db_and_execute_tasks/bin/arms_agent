@@ -54,7 +54,7 @@ insert_into_output_table() {
 local file_name=$1
 local content id
 output_id=null
-dive
+local_dive
 out "insert_into_output_table $file_name"
 try
   if [ -f $file_name ]; then
@@ -81,7 +81,7 @@ handle_return
 }
 
 record_results_of_completed_process() {
-dive
+local_dive
 out "record_results_of_completed_process job_id=$job_id"
 try
   cd job_${job_id} || fail
@@ -111,7 +111,7 @@ handle_return
 }
 
 fetch_a_task() {
-dive
+local_dive
 out "fetch_a_task"
 try
   mysql_query "
@@ -129,7 +129,7 @@ handle_return
 }
 
 launch_task() {
-dive
+local_dive
 out "launch_task job_id=$job_id"
 try
   grab_row task_request_id script_content script_parameters || { err "failed to get row from array."; fail }
@@ -161,7 +161,7 @@ main_loop() {
 local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
-dive
+local_dive
 out "arms_agent main_loop"
 try
   while true; do 

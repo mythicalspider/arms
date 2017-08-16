@@ -1,7 +1,7 @@
 #!/bin/bash
 
 {
-dive
+local_dive
 out "Applying database changes..."
 try
   mysql_query "$(<$build_folder/init_db.sql)" || exit 1

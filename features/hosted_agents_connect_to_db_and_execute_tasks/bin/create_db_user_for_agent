@@ -23,7 +23,7 @@ require_var_or_ask admin_user "admin user name"
 require_var_or_ask admin_pass "admin password"
 agent_user=agent_${agent_host_id}
 
-dive
+local_dive
 out "Creating user $agent_user..."
 try
   out "Establishing db connection..."

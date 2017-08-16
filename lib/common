@@ -13,6 +13,7 @@ alias err='echo >&2 "ERROR:"'
 alias out='[ $debug -gt 0 ] && printf "[$debug] " && echo -e'
 alias out_short='[ $debug -gt 0 ] && echo -e'
 alias dive='debug=$((debug-1))'
+alias local_dive='local debug=$((debug-1))'
 
 # exception handling
 # usage example:
