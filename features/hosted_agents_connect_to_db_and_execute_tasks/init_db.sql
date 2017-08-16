@@ -59,5 +59,14 @@ create table if not exists task_status_change (
   , foreign key (error_id) references output(output_id) on update cascade on delete set null
 );
 
--- create agent user
-
+-- delimiter $$
+-- create trigger if not exists after_task_completed 
+--   after insert on task_status_change 
+--   for each row begin
+--     insert into task_request_not_done set
+--       task_request_id=NEW.task_request_id
+--     ;
+--   end
+-- $$
+-- delimiter ;
+-- 

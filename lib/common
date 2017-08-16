@@ -6,12 +6,13 @@
 shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
 set -u                    # error when a script attempts to use an unset variable
 
-alias err='echo >&2 '
+alias err='echo >&2 "ERROR:"'
 # indentation style
 #alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf %${indent}s && echo'
 # debug level style
-alias out='[ $debug -gt 0 ] && printf "[$debug] " && echo'
-alias out_short='[ $debug -gt 0 ] && echo'
+alias out='[ $debug -gt 0 ] && printf "[$debug] " && echo -e'
+alias out_short='[ $debug -gt 0 ] && echo -e'
+alias deep='debug=$((debug-1))'
 
 # exception handling
 # usage example:
@@ -38,10 +39,12 @@ alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1)); indent=$((in
 alias fail='{ return_value=1; break; }'
 
 # should be placed after any loop inside of an exception catching block
-alias maybe_break='[ $return_value == 0 ] || break;'
+alias maybe_break='[ $return_value == 0 ] || break'
+alias maybe_exit='[ $return_value == 0 ] || exit 1'
 
 # should be at the end of every function which contains a try / end_try block
 alias handle_return='return $return_value'
+alias handle_exit='exit $return_value'
 
 # newline
 newline=$'\n'

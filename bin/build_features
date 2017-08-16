@@ -6,9 +6,9 @@ set -u
 debug=${debug:-1}
 featureset="${1:-}"
 
-unset cat_no_comments
-cat_no_comments() {
-  cat "$@" | grep -v "^ *#"
+unset strip_comments
+strip_comments() {
+  sed 's/\(.*\)#.*/\1/'
 }
 
 unset verify_dependencies
@@ -16,7 +16,7 @@ verify_dependencies() {
   local dp=features/$feature/dependencies
   local found f
   if [ -f $dp ]; then
-    for dependency in $(cat_no_comments $dp); do
+    for dependency in $(cat $dp | strip_comments); do
       unset found
       for f in "${features[@]}"; do
         if [ "$f" == "$dependency" ]; then
@@ -68,7 +68,7 @@ process_features() {
   local feature feature_line features="" fp field
   OIFS="$IFS"
   IFS=$'\n'
-  for feature_line in $(cat_no_comments feature_sets/$featureset); do
+  for feature_line in $(cat feature_sets/$featureset | strip_comments); do
     IFS="$OIFS"
     feature_line=( $feature_line )
     feature="${feature_line[0]}"
@@ -91,7 +91,7 @@ process_features() {
     standard_convention || exit 1
 
     cd ../.. || exit 1
-
+    
     features=( $feature "${features[@]}" )
   done
 

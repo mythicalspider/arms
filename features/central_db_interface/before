@@ -1,12 +1,10 @@
 #!/bin/bash
 
-#if system_matches "linux gentoo"; then
-#  
-#fi
-
-unset dbexecute
-dbexecute() {
-mysql -N -u${db_user} -p${db_pass} -h${db_host} "${@:-}" || return 1
+{
+try
+  central_db_name=arms
+  host=$db_host user=$db_user pass=$db_pass mysql_connect || exit 1
+end_try
+handle_return
 }
 
-central_db_name=arms

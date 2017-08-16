@@ -1,5 +1,10 @@
 #!/bin/bash
 
-out "Applying database changes..."
-cat $build_folder/init_db.sql | dbexecute || exit 1
+{
+try
+  out "Applying database changes..."
+  cat $build_folder/init_db.sql | mysql_query || exit 1
+end_try
+handle_return
+}
 

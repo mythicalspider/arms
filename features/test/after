@@ -1,9 +1,14 @@
 #!/bin/bash
 
-out "Running tests..."
+{
+try
+  out "Running tests..."
 
-test_result_path=$build_folder/test_results
-rm $test_result_path &>/dev/null
+  test_result_path=$build_folder/test_results
+  rm $test_result_path &>/dev/null
+end_try
+handle_return
+}
 
 unset executeTests
 executeTests() {

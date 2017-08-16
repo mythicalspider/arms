@@ -10,8 +10,8 @@ for file in $(find lib -mindepth 1 -maxdepth 1 -not -name common -not -name ".*"
   source $file || exit 1
 done
 
-dbexecute() {
-mysql -u$admin_user -p$admin_pass -h$db_host $db_name || return 1
+establish_connection() {
+  host=$db_host db=$db_name user=$admin_user pass=$admin_pass mysql_connect || return 1
 }
 
 main() {
@@ -25,6 +25,10 @@ agent_user=agent_${agent_host_id}
 
 out "Creating user $agent_user..."
 try
+  out "Establishing db connection..."
+  establish_connection || exit 1
+
+  out "Granting permissions..."
   cat <<EOF | dbexecute || exit 1
     create user if not exists ${agent_user}@'localhost' identified by '${agent_pass}';
     grant insert on ${db_name}.output to '${agent_user}';

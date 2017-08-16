@@ -13,7 +13,7 @@
 #  user=mydbuser db=mydb host=myhost mysql_connect 
 #  
 #  #query db and get $DATA
-#  mysql_query "SELECT dt_whatever from tbl_lol WHERE dt_rofl=10"
+#  echo "SELECT dt_whatever from tbl_lol WHERE dt_rofl=10" | mysql_query 
 #  
 #  #close connection
 #  mysql_close
@@ -51,51 +51,68 @@
 # set a default here
 export MYSQL_READ_TIMEOUT=10
 
-#args handle query
+# usage: HANDLE={connection handle} mysql_check 
 function mysql_check {
-  local handle
-  handle=(${1//_/ })
-  #has right structure && is still running && we opened it?
-  if [[ ${#handle[*]} == 3 ]] && ps -p ${handle[2]} 2>> /dev/null >> /dev/null && { echo "" >&${handle[1]}; } 2> /dev/null; then
-    return 0
-  fi
-  return 1
+  out "mysql_check"
+  try
+    local handle
+    handle=(${HANDLE//_/ })
+    if [[ ${#handle[*]} != 3 ]]; then
+      err "HANDLE structure is wrong: HANDLE=$HANDLE"
+      fail
+    fi
+    if ! ps ${handle[2]} &>/dev/null; then
+      err "Process ${handle[2]} is not running."
+      err "ps ${handle[2]}: $(ps ${handle[2]})"
+      fail
+    fi
+    if ! echo "" >&${handle[1]}; then
+      err "Can't write to file descriptor ${handle[1]}"
+      fail
+    fi
+    out "successful connection check"
+  end_try
+  handle_return
 }
 
 # open mysql connection
 # usage: user="myuser" pass="mypass" host="myhost" db="mydb" mysql_connection
-#   host and pass are optional
+#   host, db, user, and pass are optional
 # returns $HANDLE
 function mysql_connect {
   local argv argc HANDLEID i
-  out "mysql_connect host=$host db=$db user=$user pass=$pass"
+  out "mysql_connect host=${host:-} db=${db:-} user=${user:-} pass=${pass:-}"
   try
     #prepare args
     argv=($*)
     argc=${#argv[*]}
 
-    host="${host:-localhost}"
-    if [ "$pass" ]; then
-      pass="-p$pass"
+    if [ "${host:-}" ]; then
+      host="-h $host "
     fi
-
-    if [[ ${#user} < 1 || ${#db} < 1 ]]; then
-      err "ERROR: Options user and db are required!"
-      fail
+    if [ "${db:-}" ]; then
+      db="-D $db "
+    fi
+    if [ "${user:-}" ]; then
+      user="-u $user "
+    fi
+    if [ "${pass:-}" ]; then
+      pass="-p$pass "
     fi
 
     # init connection and channels
     # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
     HANDLEID="MYSQL$RANDOM"
-    eval "coproc $HANDLEID { stdbuf -oL mysql -u $user $pass -h $host -D $db --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
+    eval "coproc $HANDLEID { stdbuf -oL mysql ${user:-}${pass:-}${host:-}${db:-} --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
     HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
     mysql_capture_output 
     if mysql_check $HANDLE; then
       export HANDLE
+      out "successful connection established: $HANDLE"
       break
     else
-      err "ERROR: Connection failed to $user@$host->DB:$db!"
-      echo "$output"
+      err "Connection failed to $user@$host->DB:$db!"
+      echo "$mysql_connect_output"
       fail
     fi
   end_try
@@ -104,27 +121,27 @@ function mysql_connect {
 
 function mysql_capture_output {
 local handle=(${HANDLE//_/ }) line
-output=""
+mysql_connect_output=""
 while read -t 1 -ru ${handle[0]} line; do
-  output="$output$newline$line"
+  mysql_connect_output="$output$newline$line"
 done
 }
 
-# usage: HANDLE={handle} mysql_query {query}
+# usage: echo "{query}" | HANDLE={handle} mysql_query
 # return: $DATA[0] = affected rows/number of sets;
 #         $DATA[1] = key=>values pairs following
 #         $DATA[2] = key1; DATA[3] = val1
 #         $DATA[4] = key2; DATA[5] = val2 (depending on number of columns, rows)
 function mysql_query {
   local handle query affected line results_open row_open cols key val timed_out
-  query=$1
-  out "mysql_query ${query}"
+  query=$(</dev/stdin)
+  out "mysql_query\n${query}"
   try
-    if ! mysql_check $HANDLE; then
-      err "ERROR: Connection not open!"
+    handle=(${HANDLE//_/ })
+    if ! mysql_check; then
+      err "Connection not open!"
       return 1
     fi
-    handle=(${HANDLE//_/ })
 
     # use this to keep track of where you are when reading this data
     export current_row=0
@@ -220,10 +237,10 @@ function grab_row {
   current_row=$((current_row+1))
 }
 
-# usage: dbfetch_single_value {query}
+# usage: echo "{query}" | dbfetch_single_value
 #   sets r={value returned}
 function dbfetch_single_value {
-dbexecute "$1" || return 1
+mysql_query || return 1
 if more_rows_to_read; then 
   grab_row r || return 1
 fi
@@ -232,17 +249,17 @@ fi
 # usage: HANDLE={handle} mysql_close
 function mysql_close {
   local handle
-  if ! mysql_check $1; then
-    err "ERROR: Connection not open!"
+  if ! mysql_check; then
+    err "Connection not open!"
     return 1
   fi
   handle=(${1//_/ })
   echo "exit;" >&${handle[1]}
 
-  if ! mysql_check $1; then
+  if ! mysql_check; then
     return 0
   else
-    err "ERROR: Couldn't close connection!"
+    err "Couldn't close connection!"
     return 1
   fi
 }

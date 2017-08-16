@@ -12,10 +12,6 @@ done
 
 lock arms || { err "arms agent is already running"; exit 1; }
 
-dbexecute() {
-mysql_query "$1" || return 1
-}
-
 if [ ! -f arms_agent.config ]; then
   err "Missing arms_agent.config. It must exist in the current directory."
   exit 1
@@ -64,11 +60,11 @@ try
     eval "content=\$(<$file_name)"
     content=${content//'/\\'}
     if [ "$content" ]; then
-      dbexecute "
+      echo "
         insert into output set
           creation_time=now()
           , content='$content'
-        " || { err "couldn't insert record into output table."; fail }
+        " | mysql_query || { err "couldn't insert record into output table."; fail }
 
       dbfetch_single_value "select last_insert_id()" || fail
       output_id=$r
@@ -96,7 +92,7 @@ try
   insert_into_output_table error || fail
   local eid=$output_id
 
-  dbexecute "
+  echo "
     insert into task_status_change set 
       task_request_id=$(<task_request_id)
       , output_id=$oid
@@ -104,7 +100,7 @@ try
       , event_time=now()
       , new_status='done'
       , result='$job_status'
-    " || { err "failed to insert task change record."; fail }
+    " | mysql_query || { err "failed to insert task change record."; fail }
 
   cd .. || fail
   rm -rf job_${job_id} 
@@ -115,7 +111,7 @@ handle_return
 fetch_a_task() {
 out "fetch_a_task"
 try
-  dbexecute "
+  echo "
     select tr.task_request_id, s.content, tr.parameters 
     from task_request_not_done trnd 
     inner join task_request tr using (task_request_id)
@@ -124,7 +120,7 @@ try
     where host_id = $host_id
     and tsc.task_request_id is null
     limit 1
-    " || { err "failed to fetch new tasks."; fail }
+    " | mysql_query || { err "failed to fetch new tasks."; fail }
 end_try
 handle_return
 }
@@ -133,12 +129,12 @@ launch_task() {
 out "launch_task job_id=$job_id"
 try
   grab_row task_request_id script_content script_parameters || { err "failed to get row from array."; fail }
-  dbexecute "
+  echo "
   insert into task_status_change set
     task_request_id = $task_request_id
     , event_time = now()
     , new_status = 'started'
-  " || { err "failed to update task status."; fail }
+  " | mysql_query || { err "failed to update task status."; fail }
 
   mkdir job_${job_id} || fail
   cd job_${job_id} || fail

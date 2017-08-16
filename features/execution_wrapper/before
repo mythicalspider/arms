@@ -1,7 +1,11 @@
 #!/bin/bash
 
-build_folder=/tmp/fop_build/$$
-rm -rf $build_folder &>/dev/null || exit 1
-mkdir -p $build_folder || exit 1
-out "Writing to build_folder: $build_folder"
-
+{
+try
+  build_folder=/tmp/fop_build/$$
+  rm -rf $build_folder &>/dev/null || exit 1
+  mkdir -p $build_folder || exit 1
+  out "Writing to build_folder: $build_folder"
+end_try
+handle_return
+}
