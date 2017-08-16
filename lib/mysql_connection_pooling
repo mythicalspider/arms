@@ -53,6 +53,7 @@ export MYSQL_READ_TIMEOUT=10
 
 # usage: HANDLE={connection handle} mysql_check 
 function mysql_check {
+  dive
   out "mysql_check"
   try
     local handle
@@ -81,6 +82,7 @@ function mysql_check {
 # returns $HANDLE
 function mysql_connect {
   local argv argc HANDLEID i
+  dive
   out "mysql_connect host=${host:-} db=${db:-} user=${user:-} pass=${pass:-}"
   try
     #prepare args
@@ -127,14 +129,15 @@ while read -t 1 -ru ${handle[0]} line; do
 done
 }
 
-# usage: echo "{query}" | HANDLE={handle} mysql_query
+# usage: HANDLE={handle} mysql_query "{query}"
 # return: $DATA[0] = affected rows/number of sets;
 #         $DATA[1] = key=>values pairs following
 #         $DATA[2] = key1; DATA[3] = val1
 #         $DATA[4] = key2; DATA[5] = val2 (depending on number of columns, rows)
 function mysql_query {
   local handle query affected line results_open row_open cols key val timed_out
-  query=$(</dev/stdin)
+  query=$1
+  dive
   out "mysql_query\n${query}"
   try
     handle=(${HANDLE//_/ })
@@ -237,10 +240,10 @@ function grab_row {
   current_row=$((current_row+1))
 }
 
-# usage: echo "{query}" | dbfetch_single_value
+# usage: dbfetch_single_value "{query}"
 #   sets r={value returned}
 function dbfetch_single_value {
-mysql_query || return 1
+mysql_query "${1}" || return 1
 if more_rows_to_read; then 
   grab_row r || return 1
 fi

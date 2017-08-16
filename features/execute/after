@@ -1,9 +1,10 @@
 #!/bin/bash
 
 {
+dive
+out "Applying database changes..."
 try
-  out "Applying database changes..."
-  cat $build_folder/init_db.sql | mysql_query || exit 1
+  mysql_query "$(<$build_folder/init_db.sql)" || exit 1
 end_try
 handle_return
 }

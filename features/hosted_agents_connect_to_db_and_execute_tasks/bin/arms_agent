@@ -54,17 +54,18 @@ insert_into_output_table() {
 local file_name=$1
 local content id
 output_id=null
+dive
 out "insert_into_output_table $file_name"
 try
   if [ -f $file_name ]; then
     eval "content=\$(<$file_name)"
     content=${content//'/\\'}
     if [ "$content" ]; then
-      echo "
+      mysql_query "
         insert into output set
           creation_time=now()
           , content='$content'
-        " | mysql_query || { err "couldn't insert record into output table."; fail }
+        " || { err "couldn't insert record into output table."; fail }
 
       dbfetch_single_value "select last_insert_id()" || fail
       output_id=$r
@@ -80,6 +81,7 @@ handle_return
 }
 
 record_results_of_completed_process() {
+dive
 out "record_results_of_completed_process job_id=$job_id"
 try
   cd job_${job_id} || fail
@@ -92,7 +94,7 @@ try
   insert_into_output_table error || fail
   local eid=$output_id
 
-  echo "
+  mysql_query "
     insert into task_status_change set 
       task_request_id=$(<task_request_id)
       , output_id=$oid
@@ -100,7 +102,7 @@ try
       , event_time=now()
       , new_status='done'
       , result='$job_status'
-    " | mysql_query || { err "failed to insert task change record."; fail }
+    " || { err "failed to insert task change record."; fail }
 
   cd .. || fail
   rm -rf job_${job_id} 
@@ -109,9 +111,10 @@ handle_return
 }
 
 fetch_a_task() {
+dive
 out "fetch_a_task"
 try
-  echo "
+  mysql_query "
     select tr.task_request_id, s.content, tr.parameters 
     from task_request_not_done trnd 
     inner join task_request tr using (task_request_id)
@@ -120,21 +123,22 @@ try
     where host_id = $host_id
     and tsc.task_request_id is null
     limit 1
-    " | mysql_query || { err "failed to fetch new tasks."; fail }
+    " || { err "failed to fetch new tasks."; fail }
 end_try
 handle_return
 }
 
 launch_task() {
+dive
 out "launch_task job_id=$job_id"
 try
   grab_row task_request_id script_content script_parameters || { err "failed to get row from array."; fail }
-  echo "
+  mysql_query "
   insert into task_status_change set
     task_request_id = $task_request_id
     , event_time = now()
     , new_status = 'started'
-  " | mysql_query || { err "failed to update task status."; fail }
+  " || { err "failed to update task status."; fail }
 
   mkdir job_${job_id} || fail
   cd job_${job_id} || fail
@@ -157,6 +161,7 @@ main_loop() {
 local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
+dive
 out "arms_agent main_loop"
 try
   while true; do 
