@@ -1,6 +1,6 @@
 #!/bin/bash
 
-{
+main() {
 local_dive
 out "Applying database changes..."
 try
@@ -8,4 +8,6 @@ try
 end_try
 handle_return
 }
+
+main || exit 1
 

@@ -65,6 +65,5 @@ end_try
 handle_return
 }
 
-export debug=9
 run_test || return 1
 
