@@ -2,6 +2,7 @@
 
 {
 try
+  undive
   central_db_name=arms
   host=$db_host user=$db_user pass=$db_pass mysql_connect || exit 1
 end_try

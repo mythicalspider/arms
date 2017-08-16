@@ -110,7 +110,7 @@ function mysql_connect {
     mysql_capture_output 
     if mysql_check $HANDLE; then
       export HANDLE
-      out "successful connection established: $HANDLE"
+      out "Successful connection established: $HANDLE"
       break
     else
       err "Connection failed to $user@$host->DB:$db!"
