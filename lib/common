@@ -63,6 +63,16 @@ trim() {
 sed -e 's/^[[:space:]]*\(.*\)[[:space:]]*$/\1/'
 }
 
+# usage: show_array {var name}
+show_array() {
+local name=$1 i size
+#eval "size=\${#${name}[*]}"
+echo "size=$size"
+for ((i=0; i<size; i++)); do
+  eval "echo \"${name}[$i]=\\\"\${$name[$i]}\\\"\""
+done
+}
+
 # usage: echo " blah   " | aligned_trim
 # will keep indentation, and only strip leading spaces equal to the number on the first line
 aligned_trim() {
