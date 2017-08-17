@@ -53,26 +53,29 @@ export MYSQL_READ_TIMEOUT=10
 
 # usage: HANDLE={connection handle} mysql_check 
 function mysql_check {
-  out "mysql_check"
-  try
-    local handle
-    handle=(${HANDLE//_/ })
-    if [[ ${#handle[*]} != 3 ]]; then
-      err "HANDLE structure is wrong: HANDLE=$HANDLE"
-      fail
-    fi
-    if ! ps ${handle[2]} &>/dev/null; then
-      err "Process ${handle[2]} is not running."
-      err "ps ${handle[2]}: $(ps ${handle[2]})"
-      fail
-    fi
-    if ! echo "" >&${handle[1]}; then
-      err "Can't write to file descriptor ${handle[1]}"
-      fail
-    fi
-    out "Successful connection check"
-  end_try
-  handle_return
+out "mysql_check"
+try
+  local handle
+  handle=(${HANDLE//_/ })
+  if [[ ${#handle[*]} != 3 ]]; then
+    err "HANDLE structure is wrong: HANDLE=$HANDLE"
+    fail
+  fi
+  if ! ps ${handle[2]} &>/dev/null; then
+    err "Process ${handle[2]} is not running."
+    err "ps ${handle[2]}: $(ps ${handle[2]})"
+    fail
+  fi
+  if ! echo "" >&${handle[1]}; then
+    err "Can't write to file descriptor ${handle[1]}"
+    err "previous mysql output:\n$mysql_connect_output"
+    mysql_capture_output 
+    err "current mysql output:\n$mysql_connect_output"
+    fail
+  fi
+  out "Successful connection check"
+end_try
+handle_return
 }
 
 # open mysql connection
@@ -80,50 +83,54 @@ function mysql_check {
 #   host, db, user, and pass are optional
 # returns $HANDLE
 function mysql_connect {
-  local argv argc HANDLEID i
-  out "mysql_connect host=${host:-} db=${db:-} user=${user:-} pass=${pass:-}"
-  try
-    #prepare args
-    argv=($*)
-    argc=${#argv[*]}
+local argv argc HANDLEID i
+out "mysql_connect host=${host:-} db=${db:-} user=${user:-} pass=${pass:-}"
+try
+  #prepare args
+  argv=($*)
+  argc=${#argv[*]}
 
-    if [ "${host:-}" ]; then
-      host="-h $host "
-    fi
-    if [ "${db:-}" ]; then
-      db="-D $db "
-    fi
-    if [ "${user:-}" ]; then
-      user="-u $user "
-    fi
-    if [ "${pass:-}" ]; then
-      pass="-p$pass "
-    fi
+  if [ "${host:-}" ]; then
+    host="-h $host "
+  fi
+  if [ "${db:-}" ]; then
+    db="-D $db "
+  fi
+  if [ "${user:-}" ]; then
+    user="-u $user "
+  fi
+  if [ "${pass:-}" ]; then
+    pass="-p$pass "
+  fi
 
-    # init connection and channels
-    # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
-    HANDLEID="MYSQL$RANDOM"
-    eval "coproc $HANDLEID { stdbuf -oL mysql ${user:-}${pass:-}${host:-}${db:-} --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
-    HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
-    mysql_capture_output 
-    if mysql_check $HANDLE; then
-      export HANDLE
-      out "Successful connection established: $HANDLE"
-      break
-    else
-      err "Connection failed to $user@$host->DB:$db!"
-      echo "$mysql_connect_output"
-      fail
-    fi
-  end_try
-  handle_return
+  # init connection and channels
+  # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
+  HANDLEID="MYSQL$RANDOM"
+  eval "coproc $HANDLEID { stdbuf -oL mysql ${user:-}${pass:-}${host:-}${db:-} --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
+  HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
+  mysql_capture_output 
+  if mysql_check $HANDLE; then
+    export HANDLE
+    out "Successful connection established: $HANDLE"
+    break
+  else
+    err "Connection failed to $user@$host->DB:$db!"
+    echo "$mysql_connect_output"
+    fail
+  fi
+end_try
+handle_return
 }
 
 function mysql_capture_output {
 local handle=(${HANDLE//_/ }) line
 mysql_connect_output=""
 while read -t 1 -ru ${handle[0]} line; do
-  mysql_connect_output="$output$newline$line"
+  if [ "${mysql_connect_output:-}" ]; then
+    mysql_connect_output="$mysql_connect_output$newline$line"
+  else
+    mysql_connect_output="$line"
+  fi
 done
 }
 
@@ -143,16 +150,23 @@ function mysql_bulk {
 local handle bulk query affected line results_open row_open cols key val timed_out
 bulk=$1
 out "mysql_bulk"
-deep_out_short "${bulk}"
+deep_out "all statements:\n${bulk}"
 try
   if ! deep_dive mysql_check; then
     err "Connection not open!"
     fail
   fi
 
-  out "Splitting apart sql statements..."
   echo "$bulk" | while read -r line; do
-    query="${query:-}$newline$line"
+    line=$(strip_bar_comments <<<$line)
+    line=$(trim <<<$line)
+    if [ "$line" ]; then
+      if [ "${query:-}" ]; then
+        query="${query:-}$newline$line"
+      else
+        query="$line"
+      fi
+    fi
     if [[ "$line" == *\; ]]; then
       skip_check=true mysql_query "$query" || fail
       query=""
@@ -193,7 +207,13 @@ try
   fi
 
   out "Sending query..."
-  echo "$query" >&${handle[1]} || fail
+  echo "$query" >&${handle[1]} || {
+    err "Can't write to file descriptor ${handle[1]}"
+    err "previous mysql output:\n$mysql_connect_output"
+    mysql_capture_output 
+    err "current mysql output:\n$mysql_connect_output"
+    fail
+  }
 
   #get output
   DATA=();

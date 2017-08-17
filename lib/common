@@ -6,7 +6,7 @@
 shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
 set -u                       # error when a script attempts to use an unset variable
 
-alias err='echo >&2 "ERROR:"'
+alias err='echo -e >&2 "ERROR:"'
 alias out='[ $debug -gt 0 ] && printf "[%${debug_digits}d] " $debug && echo -e'
 alias out_short='[ $debug -gt 0 ] && echo -e'
 alias deep_out='[ $debug -gt 10 ] && printf "[%${debug_digits}d] " $((debug-10)) && echo -e'
@@ -58,6 +58,10 @@ alias handle_exit='exit $return_value'
 
 # newline
 newline=$'\n'
+# usage: echo " blah   " | trim
+trim() {
+  sed -e 's/^[[:space:]]*\(.*\)[[:space:]]*$/\1/'
+}
 
 true                      # make sure we return successfully so calling script can properly move forward
 
