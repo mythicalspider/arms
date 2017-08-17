@@ -40,7 +40,7 @@ while true; do
   if [ -z "$v" ]; then
     v=`eval echo "$"{#$var_name[*]}`
     if [ "$v" == "0" ]; then
-      read -ep "${description}? ${var_name}=" new_value
+      IFS= read -ep "${description}? ${var_name}=" new_value
       if [ "$new_value" ]; then
         eval "var_name=\"${new_value}\""
         break

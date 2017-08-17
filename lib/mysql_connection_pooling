@@ -69,7 +69,7 @@ try
   if ! echo "" >&${handle[1]}; then
     err "Can't write to file descriptor ${handle[1]}"
     err "previous mysql output:\n$mysql_connect_output"
-    mysql_capture_output 
+    mysql_capture_output || fail
     err "current mysql output:\n$mysql_connect_output"
     fail
   fi
@@ -106,15 +106,27 @@ try
   # init connection and channels
   # we do it in XML cause otherwise we can't detect the end of data and so would need a read timeout O_o
   HANDLEID="MYSQL$RANDOM"
-  eval "coproc $HANDLEID { stdbuf -oL mysql ${user:-}${pass:-}${host:-}${db:-} --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
-  HANDLE=$(eval 'echo ${'${HANDLEID}'[0]}_${'${HANDLEID}'[1]}_${'${HANDLEID}'_PID}')
-  mysql_capture_output 
+  eval "coproc $HANDLEID { stdbuf -oL mysql ${user:-}${pass:-}${host:-}${db:-} -A --force --unbuffered --xml -vvv 2>&1; }" # 2> /dev/null
+  local in=$(eval 'echo ${'${HANDLEID}'[0]}')
+  local out=$(eval 'echo ${'${HANDLEID}'[1]}')
+  local pid=$(eval 'echo ${'${HANDLEID}'_PID}')
+
+  # move input and output file descriptors to stable ones that the shell won't steal
+  # this breaks the ability to manage multiple connections, but I never use that anyway.
+  # should I ever need that, this can be upgraded to a more complex system 
+  #exec 4<&${in}-
+  #exec 5>&${out}-
+  #in=4
+  #out=5
+
+  export HANDLE="${in}_${out}_${pid}"
+
+  mysql_capture_output || fail
   if mysql_check $HANDLE; then
-    export HANDLE
     out "Successful connection established: $HANDLE"
     break
   else
-    err "Connection failed to $user@$host->DB:$db!"
+    err "Connection failed to ${user:-}@${host:-}->DB:${db:-}!"
     echo "$mysql_connect_output"
     fail
   fi
@@ -125,21 +137,23 @@ handle_return
 function mysql_capture_output {
 local handle=(${HANDLE//_/ }) line
 mysql_connect_output=""
-while read -t 1 -ru ${handle[0]} line; do
+while IFS= read -t 0.5 -ru ${handle[0]} line; do
   if [ "${mysql_connect_output:-}" ]; then
     mysql_connect_output="$mysql_connect_output$newline$line"
   else
     mysql_connect_output="$line"
   fi
 done
+return 0
 }
 
 function mysql_flush_output {
 local handle=(${HANDLE//_/ }) line
-while read -t 0.1 -ru ${handle[0]} line; do
+while IFS= read -t 0.1 -ru ${handle[0]} line; do
   :
   #echo "$line" >>/tmp/sql_output
 done
+return 0
 }
 
 # usage: [HANDLE={handle}] mysql_bulk "{queries}"
@@ -147,8 +161,9 @@ done
 #   will not return results
 #   every statement must end with a semicolon at the end of the line (nothing must follow it). 
 function mysql_bulk {
-local handle bulk query affected line results_open row_open cols key val timed_out
+local handle bulk query affected line results_open row_open cols key val timed_out delimiter ready
 bulk=$1
+bulk=$(echo "$bulk" | strip_bar_comments | aligned_trim)
 out "mysql_bulk"
 deep_out "all statements:\n${bulk}"
 try
@@ -157,21 +172,38 @@ try
     fail
   fi
 
-  echo "$bulk" | while read -r line; do
-    line=$(strip_bar_comments <<<$line)
-    line=$(trim <<<$line)
+  # this complication is needed to avoid piping the value into the while loop, 
+  #   and thus causing mysql_query to run in a subprocesses,
+  #   making it not able to access the mysql connector process
+  #open_fifo 3
+  #echo "$bulk" >&3 #&
+  #while read -r -u 3 line; do
+  delimiter=\;
+  while IFS= read -r line; do
     if [ "$line" ]; then
       if [ "${query:-}" ]; then
-        query="${query:-}$newline$line"
+        query=${query:-}$newline$line
       else
-        query="$line"
+        query=$line
       fi
     fi
-    if [[ "$line" == *\; ]]; then
+    if [[ "$line" =~ ^delimiter\ (.*)$ ]]; then
+      delimiter=${BASH_REMATCH[1]}
+      deep_out "Changing delimiter to: [$delimiter]"
+      ready=true
+    fi
+    if [[ "$line" == *$delimiter ]]; then
+      ready=true
+    fi
+    if [ "${ready:-}" ]; then
+      echo -e "query going into mysql_query:\n$query"
       skip_check=true mysql_query "$query" || fail
       query=""
+      unset ready
     fi
-  done; maybe_break
+  done < <(echo "$bulk"); maybe_break
+  #close_fifo 3
+
   if [ "${query:-}" ]; then
     skip_check=true mysql_query "$query" || fail
   fi
@@ -188,6 +220,7 @@ handle_return
 function mysql_query {
 local handle query affected line results_open row_open cols key val timed_out
 query=$1
+query=$(echo "$query" | strip_bar_comments | aligned_trim)
 out "mysql_query\n${query}"
 try
   handle=(${HANDLE//_/ })
@@ -202,16 +235,18 @@ try
   export current_row=0
 
   # delimit query; otherwise we block forever/timeout
-  if [[ ! "$query" == *\; ]]; then
-    query="$query;"
-  fi
+  # nevermind:  if we timeout here, fix the incoming query
+  #   we need to be able to handle alternative delimiters as is required by trigger definitions for example
+  #if [[ ! "$query" == *\; ]]; then
+  #  query="$query;"
+  #fi
 
   out "Sending query..."
   echo "$query" >&${handle[1]} || {
     err "Can't write to file descriptor ${handle[1]}"
-    err "previous mysql output:\n$mysql_connect_output"
-    mysql_capture_output 
-    err "current mysql output:\n$mysql_connect_output"
+    err "Previous mysql output:\n$mysql_connect_output"
+    mysql_capture_output || fail
+    err "Current mysql output:\n$mysql_connect_output"
     fail
   }
 
@@ -224,10 +259,16 @@ try
   cols=0
   deep_dive
   out "Fetching output..."
-  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >>/tmp/sql_output
-  while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
+  while IFS= read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
   do
-    echo "$line" >>/tmp/sql_output
+    deep_out "Mysql output: [$line]"
+    if [ ! "$line" ]; then
+      if [[ "$query" == use* ]] || [[ "$query" == delimiter* ]]; then
+        deep_out "Exiting early because it's a use or delimiter command."
+        break
+      fi
+    fi
+
     # WAS ERROR?
     if [[ "$line" == *"ERROR"* ]]; then
       err "$line"
@@ -244,6 +285,7 @@ try
     # BEGIN FETCHING RESULTS
     if [[ $line =~ \<resultset ]]; then
       results_open=1
+      continue
     fi
 
     #RESULTS
@@ -252,6 +294,7 @@ try
         out "Row start"
         row_open=1
         cols=0
+        continue
       elif [[ $line =~ \<field && $row_open == 1 ]]; then
         key=$([[ "$line" =~ name\=\"([^\"]+)\" ]] && echo ${BASH_REMATCH[1]})
         val=$([[ "$line" =~ \>(.*)\<\/ ]] && echo ${BASH_REMATCH[1]} || echo "NULL")
@@ -259,12 +302,14 @@ try
         DATA[${#DATA[*]}]=$val
         cols=$[$cols+1]
         out "Field found: key=$key  val=$val"
+        continue
       elif [[ $line =~ \<\/row ]]; then
         out "Row end"
         row_open=0
         DATA[0]=$[${DATA[0]}+1]
         DATA[1]=$cols
         column_count=$cols
+        continue
       fi
     fi
 

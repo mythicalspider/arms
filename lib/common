@@ -60,7 +60,45 @@ alias handle_exit='exit $return_value'
 newline=$'\n'
 # usage: echo " blah   " | trim
 trim() {
-  sed -e 's/^[[:space:]]*\(.*\)[[:space:]]*$/\1/'
+sed -e 's/^[[:space:]]*\(.*\)[[:space:]]*$/\1/'
+}
+
+# usage: echo " blah   " | aligned_trim
+# will keep indentation, and only strip leading spaces equal to the number on the first line
+aligned_trim() {
+local trim_string 
+IFS= read -r line
+while [ ! "${line:-}" ]; do
+  IFS= read -r line
+done
+if [[ "$line" =~ ^(\ *)(.*)(\ *)$ ]]; then
+  trim_string=${BASH_REMATCH[1]}
+  line=${BASH_REMATCH[2]}
+  echo "${line:-}"
+fi
+while IFS= read -r line; do
+  if [[ "$line" =~ ^${trim_string}(.*)(\ *)$ ]]; then
+    line=${BASH_REMATCH[1]}
+    echo "${line:-}"
+  elif [[ "$line" =~ ^(\ *)(.*)(\ *)$ ]]; then
+    line=${BASH_REMATCH[2]}
+    echo "${line:-}"
+  fi
+done
+}
+
+# usage: open_fifo {file descriptor to connect to fifo}
+open_fifo() {
+local pipe=$(mktemp -u)
+local fd=$1
+mkfifo $pipe
+eval "exec ${fd}<>${pipe}"
+rm $pipe 
+}
+
+# usage: close_fifo {file descriptor to connect to fifo}
+close_fifo() {
+exec $1>&-
 }
 
 true                      # make sure we return successfully so calling script can properly move forward
