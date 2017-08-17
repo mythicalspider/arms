@@ -1,6 +1,6 @@
 cleanup_build_folder
 execution_wrapper
-#test
+test
 execute
 central_db_interface db_host=127.0.0.1 db_user=test db_pass=insecure
 hosted_agents_connect_to_db_and_execute_tasks
