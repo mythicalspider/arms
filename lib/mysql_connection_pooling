@@ -196,7 +196,6 @@ try
       ready=true
     fi
     if [ "${ready:-}" ]; then
-      echo -e "query going into mysql_query:\n$query"
       skip_check=true mysql_query "$query" || fail
       query=""
       unset ready

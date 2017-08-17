@@ -32,6 +32,7 @@ try
         insert into output set
           creation_time=now()
           , content='$content'
+        ;
         " || { err "couldn't insert record into output table."; fail }
 
       db_fetch_single_value "select last_insert_id()" || fail
@@ -68,6 +69,7 @@ try
       , event_time=now()
       , new_status='done'
       , result='$job_status'
+    ;
     " || { err "failed to insert task change record."; fail }
 
   cd .. || fail
@@ -88,6 +90,7 @@ try
     where host_id = $host_id
     and tsc.task_request_id is null
     limit 1
+    ;
     " || { err "failed to fetch new tasks."; fail }
 end_try
 handle_return
@@ -102,6 +105,7 @@ try
     task_request_id = $task_request_id
     , event_time = now()
     , new_status = 'started'
+  ;
   " || { err "failed to update task status."; fail }
 
   mkdir job_${job_id} || fail
@@ -178,7 +182,7 @@ handle_return
 main() {
 undive
 try
-  lock arms || { err "arms agent is already running"; exit 1; }
+  deep_dive lock arms || { err "arms agent is already running"; exit 1; }
 
   if [ ! -f arms_agent.config ]; then
     err "Missing arms_agent.config. It must exist in the current directory."
