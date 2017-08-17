@@ -127,7 +127,15 @@ while read -t 1 -ru ${handle[0]} line; do
 done
 }
 
-# usage: HANDLE={handle} mysql_query "{query}"
+function mysql_flush_output {
+local handle=(${HANDLE//_/ }) line
+while read -t 0.5 -ru ${handle[0]} line; do
+  :
+  #echo "$line" >>/tmp/sql_output
+done
+}
+
+# usage: [HANDLE={handle}] mysql_query "{query}"
 # return: $DATA[0] = affected rows/number of sets;
 #         $DATA[1] = key=>values pairs following
 #         $DATA[2] = key1; DATA[3] = val1
@@ -138,9 +146,9 @@ function mysql_query {
   out "mysql_query\n${query}"
   try
     handle=(${HANDLE//_/ })
-    if ! mysql_check; then
+    if ! deep_dive mysql_check; then
       err "Connection not open!"
-      return 1
+      fail
     fi
 
     # use this to keep track of where you are when reading this data
@@ -162,9 +170,12 @@ function mysql_query {
     results_open=0
     row_open=0
     cols=0
+    deep_dive
     out "Fetching output..."
+    #echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >>/tmp/sql_output
     while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
     do
+      #echo "$line" >>/tmp/sql_output
       # WAS ERROR?
       if [[ "$line" == *"ERROR"* ]]; then
         err "$line"
@@ -175,6 +186,7 @@ function mysql_query {
         DATA[0]=$affected
         export DATA
         out "Query OK"
+        mysql_flush_output
         break
       fi
 
@@ -211,10 +223,12 @@ function mysql_query {
         break
       fi
     done
+    # this must be immediately after the loop, or it won't have the correct return code
     [[ $? > 0 ]] && [[ return_value == 0 ]] && {
       err "$FUNCNAME: Read timed out!"
       fail
     }
+    deep_undive
     maybe_break
   end_try
   handle_return
