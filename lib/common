@@ -9,6 +9,10 @@ set -u                       # error when a script attempts to use an unset vari
 alias err='echo >&2 "ERROR:"'
 alias out='[ $debug -gt 0 ] && printf "[%${debug_digits}d] " $debug && echo -e'
 alias out_short='[ $debug -gt 0 ] && echo -e'
+alias deep_out='[ $debug -gt 10 ] && printf "[%${debug_digits}d] " $((debug-10)) && echo -e'
+alias deep_out_short='[ $debug -gt 10 ] && echo -e'
+alias super_out='[ $debug -gt 100 ] && printf "[%${debug_digits}d] " $((debug-100)) && echo -e'
+alias super_out_short='[ $debug -gt 100 ] && echo -e'
 
 # dive and undive should be used immediately in front of a command or at the beginning of a function with a local debug
 #   or it will shift the debug level for all code that follows

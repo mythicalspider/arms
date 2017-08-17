@@ -30,7 +30,7 @@ try
   establish_connection || exit 1
 
   out "Granting permissions..."
-  mysql_query "
+  mysql_bulk "
     create user if not exists ${agent_user}@'localhost' identified by '${agent_pass}';
     grant insert on ${db_name}.output to '${agent_user}';
     grant insert on ${db_name}.task_status_change to '${agent_user}';

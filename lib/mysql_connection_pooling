@@ -129,109 +129,139 @@ done
 
 function mysql_flush_output {
 local handle=(${HANDLE//_/ }) line
-while read -t 0.5 -ru ${handle[0]} line; do
+while read -t 0.1 -ru ${handle[0]} line; do
   :
   #echo "$line" >>/tmp/sql_output
 done
 }
 
+# usage: [HANDLE={handle}] mysql_bulk "{queries}"
+#   will correctly process more than one statement
+#   will not return results
+#   every statement must end with a semicolon at the end of the line (nothing must follow it). 
+function mysql_bulk {
+local handle bulk query affected line results_open row_open cols key val timed_out
+bulk=$1
+out "mysql_bulk"
+deep_out_short "${bulk}"
+try
+  if ! deep_dive mysql_check; then
+    err "Connection not open!"
+    fail
+  fi
+
+  out "Splitting apart sql statements..."
+  echo "$bulk" | while read -r line; do
+    query="${query:-}$newline$line"
+    if [[ "$line" == *\; ]]; then
+      skip_check=true mysql_query "$query" || fail
+      query=""
+    fi
+  done; maybe_break
+  if [ "${query:-}" ]; then
+    skip_check=true mysql_query "$query" || fail
+  fi
+end_try
+handle_return
+}
+
 # usage: [HANDLE={handle}] mysql_query "{query}"
+#   for only 1 statement or query. If you want to execute multiple statements, use mysql_bulk
 # return: $DATA[0] = affected rows/number of sets;
 #         $DATA[1] = key=>values pairs following
 #         $DATA[2] = key1; DATA[3] = val1
 #         $DATA[4] = key2; DATA[5] = val2 (depending on number of columns, rows)
 function mysql_query {
-  local handle query affected line results_open row_open cols key val timed_out
-  query=$1
-  out "mysql_query\n${query}"
-  try
-    handle=(${HANDLE//_/ })
+local handle query affected line results_open row_open cols key val timed_out
+query=$1
+out "mysql_query\n${query}"
+try
+  handle=(${HANDLE//_/ })
+  if [ ! "${skip_check:-}" ]; then
     if ! deep_dive mysql_check; then
       err "Connection not open!"
       fail
     fi
+  fi
 
-    # use this to keep track of where you are when reading this data
-    export current_row=0
+  # use this to keep track of where you are when reading this data
+  export current_row=0
 
-    # delimit query; otherwise we block forever/timeout
-    if [[ ! "$query" =~ \;\$ ]]; then
-      query="$query;"
+  # delimit query; otherwise we block forever/timeout
+  if [[ ! "$query" == *\; ]]; then
+    query="$query;"
+  fi
+
+  out "Sending query..."
+  echo "$query" >&${handle[1]} || fail
+
+  #get output
+  DATA=();
+  DATA[0]=0
+  DATA[1]=0
+  results_open=0
+  row_open=0
+  cols=0
+  deep_dive
+  out "Fetching output..."
+  echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >>/tmp/sql_output
+  while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
+  do
+    echo "$line" >>/tmp/sql_output
+    # WAS ERROR?
+    if [[ "$line" == *"ERROR"* ]]; then
+      err "$line"
+      fail
+    # WAS INSERT/UPDATE?
+    elif [[ "$line" == *"Query OK"* ]]; then
+      affected=$([[ "$line" =~ Query\ OK\,\ ([0-9]+)\ rows?\ affected ]] && echo ${BASH_REMATCH[1]})
+      DATA[0]=$affected
+      export DATA
+      out "Query OK"
+      break
     fi
 
-    out "Sending query..."
-    #send query
-    echo "$query" >&${handle[1]}
+    # BEGIN FETCHING RESULTS
+    if [[ $line =~ \<resultset ]]; then
+      results_open=1
+    fi
 
-    #get output
-    DATA=();
-    DATA[0]=0
-    DATA[1]=0
-    results_open=0
-    row_open=0
-    cols=0
-    deep_dive
-    out "Fetching output..."
-    #echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >>/tmp/sql_output
-    while read -t $MYSQL_READ_TIMEOUT -ru ${handle[0]} line
-    do
-      #echo "$line" >>/tmp/sql_output
-      # WAS ERROR?
-      if [[ "$line" == *"ERROR"* ]]; then
-        err "$line"
-        fail
-      # WAS INSERT/UPDATE?
-      elif [[ "$line" == *"Query OK"* ]]; then
-        affected=$([[ "$line" =~ Query\ OK\,\ ([0-9]+)\ rows?\ affected ]] && echo ${BASH_REMATCH[1]})
-        DATA[0]=$affected
-        export DATA
-        out "Query OK"
-        mysql_flush_output
-        break
+    #RESULTS
+    if [[ $results_open == 1 ]]; then
+      if [[ $line =~ \<row ]]; then
+        out "Row start"
+        row_open=1
+        cols=0
+      elif [[ $line =~ \<field && $row_open == 1 ]]; then
+        key=$([[ "$line" =~ name\=\"([^\"]+)\" ]] && echo ${BASH_REMATCH[1]})
+        val=$([[ "$line" =~ \>(.*)\<\/ ]] && echo ${BASH_REMATCH[1]} || echo "NULL")
+        DATA[${#DATA[*]}]=$key
+        DATA[${#DATA[*]}]=$val
+        cols=$[$cols+1]
+        out "Field found: key=$key  val=$val"
+      elif [[ $line =~ \<\/row ]]; then
+        out "Row end"
+        row_open=0
+        DATA[0]=$[${DATA[0]}+1]
+        DATA[1]=$cols
+        column_count=$cols
       fi
+    fi
 
-      # BEGIN FETCHING RESULTS
-      if [[ $line =~ \<resultset ]]; then
-        results_open=1
-      fi
-
-      #RESULTS
-      if [[ $results_open == 1 ]]; then
-        if [[ $line =~ \<row ]]; then
-          out "Row start"
-          row_open=1
-          cols=0
-        elif [[ $line =~ \<field && $row_open == 1 ]]; then
-          key=$([[ "$line" =~ name\=\"([^\"]+)\" ]] && echo ${BASH_REMATCH[1]})
-          val=$([[ "$line" =~ \>(.*)\<\/ ]] && echo ${BASH_REMATCH[1]} || echo "NULL")
-          DATA[${#DATA[*]}]=$key
-          DATA[${#DATA[*]}]=$val
-          cols=$[$cols+1]
-          out "Field found: key=$key  val=$val"
-        elif [[ $line =~ \<\/row ]]; then
-          out "Row end"
-          row_open=0
-          DATA[0]=$[${DATA[0]}+1]
-          DATA[1]=$cols
-          column_count=$cols
-        fi
-      fi
-
-      #END OF RESULTS
-      if [[ $line =~ \<\/resultset ]]; then
-        export DATA
-        break
-      fi
-    done
-    # this must be immediately after the loop, or it won't have the correct return code
-    [[ $? > 0 ]] && [[ return_value == 0 ]] && {
-      err "$FUNCNAME: Read timed out!"
-      fail
-    }
-    deep_undive
-    maybe_break
-  end_try
-  handle_return
+    #END OF RESULTS
+    if [[ $line =~ \<\/resultset ]]; then
+      export DATA
+      break
+    fi
+  done
+  # this must be immediately after the loop, or it won't have the correct return code
+  [[ $? > 0 ]] && [[ return_value == 0 ]] && {
+    err "$FUNCNAME: Read timed out!"
+    fail
+  }
+  deep_undive
+end_try
+handle_return
 }
 
 # returns true if the previous mysql_query command returned 1 or more rows

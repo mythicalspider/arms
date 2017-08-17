@@ -4,7 +4,7 @@ run_test() {
 undive
 try
   out "Setting up test data..."
-  mysql_query "
+  mysql_bulk "
     insert into host set
       host_id = 1
       , name = 'test_host'
