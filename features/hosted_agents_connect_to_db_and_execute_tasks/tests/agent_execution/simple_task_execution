@@ -47,15 +47,15 @@ EOF
 
   out "Checking results in db..."
   db_fetch_single_value "select count(*) from task_status_change 
-                         where new_status='started' and task_request_id=1" || fail
+                         where new_status='started' and task_request_id=1;" || fail
   assert_equals "${r:-}" 1 "Missing proper 'started' task_status_change record" || fail
 
   db_fetch_single_value "select count(*) from task_status_change 
-                         where new_status='done' and task_request_id=1 and result='succeeded'" || fail
+                         where new_status='done' and task_request_id=1 and result='succeeded';" || fail
   assert_equals "${r:-}" 1 "Missing proper 'done' task_status_change record" || fail
 
   db_fetch_single_value "select count(*) from task_request_not_done 
-                         where task_request_id=1" || fail
+                         where task_request_id=1;" || fail
   assert_equals "${r:-}" 0 "task_request_not_done wasn't removed after task was completed" || fail
 
   cd $OLDPWD || fail

@@ -63,9 +63,11 @@ delimiter $$
 create trigger if not exists after_task_completed 
   after insert on task_status_change 
   for each row begin
-    insert into task_request_not_done set
-      task_request_id=NEW.task_request_id
-    ;
+    if NEW.new_status='done' then
+      delete from task_request_not_done
+      where task_request_id=NEW.task_request_id
+      ;
+    end if;
   end
 $$
 delimiter ;

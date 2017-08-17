@@ -35,7 +35,7 @@ try
         ;
         " || { err "couldn't insert record into output table."; fail }
 
-      db_fetch_single_value "select last_insert_id()" || fail
+      db_fetch_single_value "select last_insert_id();" || fail
       output_id=$r
     else
       out "file exists, but has no content, so no output will be recorded."
