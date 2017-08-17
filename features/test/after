@@ -4,16 +4,17 @@ executeTests() {
 local path="$1" file dir
 try
   for file in $(find $path -mindepth 1 -maxdepth 1 -type f -printf "%f\n" | sort); do
-    echo -n "$file: "
+    out -n "$file: "
     source $path/$file &>>$test_result_path || {
-      echo "${RED}[Failed]${RESET}"
+      out_short "${RED}[Failed]${RESET}"
       cat $test_result_path
       fail
     }
-    echo "${GREEN}[Success]${RESET}"
+    out_short "${GREEN}[Success]${RESET}"
   done; maybe_break
   
   for dir in $(find $path -mindepth 1 -maxdepth 1 -type d | sort); do
+    out "Executing tests in ${dir##*/tests/}..."
     executeTests "$dir" || fail
   done; maybe_break
 end_try

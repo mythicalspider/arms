@@ -24,7 +24,6 @@ initialize_process_tracking() {
 # returns true (rc=0) if there is room for more processes in the tracking pool
 #   sets job_id = slot id of the first free slot
 can_launch_more_processes() {
-local_dive
 out "can_launch_more_processes max_tracked_processes=$max_tracked_processes"
 unset job_id
 local j
@@ -61,7 +60,6 @@ return 0
 #     job_id = slot id of the process
 #   and removes the job from the tracked list
 grab_completed_process() {
-  local_dive
   out "grab_completed_process"
   unset job_id job_pid
   local j

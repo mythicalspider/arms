@@ -23,14 +23,14 @@ require_var_or_ask admin_user "admin user name"
 require_var_or_ask admin_pass "admin password"
 agent_user=agent_${agent_host_id}
 
-local_dive
+undive
 out "Creating user $agent_user..."
 try
   out "Establishing db connection..."
   establish_connection || exit 1
 
   out "Granting permissions..."
-  cat <<EOF | dbexecute || exit 1
+  mysql_query "
     create user if not exists ${agent_user}@'localhost' identified by '${agent_pass}';
     grant insert on ${db_name}.output to '${agent_user}';
     grant insert on ${db_name}.task_status_change to '${agent_user}';
@@ -38,7 +38,7 @@ try
     grant select on ${db_name}.task_request to '${agent_user}';
     grant select on ${db_name}.script to '${agent_user}';
     grant select on ${db_name}.task_status_change to '${agent_user}';
-EOF
+  " || fail
 end_try
 }
 

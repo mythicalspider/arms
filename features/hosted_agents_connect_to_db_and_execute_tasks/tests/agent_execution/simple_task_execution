@@ -1,9 +1,9 @@
 #!/bin/bash
 
 run_test() {
-local_dive
-out "Setting up test data..."
+undive
 try
+  out "Setting up test data..."
   mysql_query "
     insert into host set
       host_id = 1
@@ -26,7 +26,6 @@ try
       , parameters = ''
       ;
   " || fail
-EOF
 
   cd $build_folder || fail
 
@@ -42,22 +41,22 @@ EOF
     max_wait=0
 EOF
 
-  db_host=127.0.0.1 db_name=$central_db_name admin_user=test admin_pass=insecure agent_host_id=1 agent_pass=insecure bin/create_db_user_for_agent || fail
+  undive db_host=127.0.0.1 db_name=$central_db_name admin_user=test admin_pass=insecure agent_host_id=1 agent_pass=insecure bin/create_db_user_for_agent || fail
 
-  bin/arms_agent || fail
+  undive bin/arms_agent || fail
 
   out "Checking results in db..."
   db_fetch_single_value "select count(*) from task_status_change 
                          where new_status='started' and task_request_id=1" || fail
-  assert_equals $r 1 "Missing proper 'started' task_status_change record" || fail
+  assert_equals "${r:-}" 1 "Missing proper 'started' task_status_change record" || fail
 
   db_fetch_single_value "select count(*) from task_status_change 
                          where new_status='done' and task_request_id=1 and result='succeeded'" || fail
-  assert_equals $r 1 "Missing proper 'done' task_status_change record" || fail
+  assert_equals "${r:-}" 1 "Missing proper 'done' task_status_change record" || fail
 
   db_fetch_single_value "select count(*) from task_request_not_done 
                          where task_request_id=1" || fail
-  assert_equals $r 0 "task_request_not_done wasn't removed after task was completed" || fail
+  assert_equals "${r:-}" 0 "task_request_not_done wasn't removed after task was completed" || fail
 
   cd $OLDPWD || fail
 

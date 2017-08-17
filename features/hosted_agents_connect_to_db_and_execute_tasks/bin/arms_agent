@@ -10,41 +10,9 @@ for file in $(find lib -mindepth 1 -maxdepth 1 -not -name common -not -name ".*"
   source $file || exit 1
 done
 
-lock arms || { err "arms agent is already running"; exit 1; }
-
-if [ ! -f arms_agent.config ]; then
-  err "Missing arms_agent.config. It must exist in the current directory."
-  exit 1
-fi
-
-source arms_agent.config
-require_var host_id db_host db_name db_pass || {
-  err "Make sure that you have defined this variable in your arms_agent.config file"
-  exit 1
-}
-
-db_user=agent_${host_id}
-
-agent_tmp=/tmp/arms_agent
-rm -rf $agent_tmp &>/dev/null
-mkdir $agent_tmp || exit 1
-cd $agent_tmp || exit 1
-
-# optional variables which may be set in arms_agent.config, or in environment
-#   max_processes : maximum number of processes to run at once
-#   max_iterations : maximum number of times to pass through the main loop. If this is unset, will run indefinitely.
-#   synchronous : if set, means tasks will be lauched syncronously instead of in the background
-#   min_wait=50 : number of seconds, minimum, to wait between task pickup cycles
-#   max_wait=70 : as above, but for maximum wait
-
-initialize_process_tracking ${max_processes:-4}
-
 establish_connection() {
   host=$db_host db=$db_name user=$db_user pass=$db_pass mysql_connect || return 1
 }
-
-out "Establishing db connection..."
-establish_connection || exit 1
 
 # usage: insert_into_output_table {file_name containing content}
 # if file doesn't exist, returns true but no output_id
@@ -54,7 +22,6 @@ insert_into_output_table() {
 local file_name=$1
 local content id
 output_id=null
-local_dive
 out "insert_into_output_table $file_name"
 try
   if [ -f $file_name ]; then
@@ -67,7 +34,7 @@ try
           , content='$content'
         " || { err "couldn't insert record into output table."; fail }
 
-      dbfetch_single_value "select last_insert_id()" || fail
+      db_fetch_single_value "select last_insert_id()" || fail
       output_id=$r
     else
       out "file exists, but has no content, so no output will be recorded."
@@ -81,7 +48,6 @@ handle_return
 }
 
 record_results_of_completed_process() {
-local_dive
 out "record_results_of_completed_process job_id=$job_id"
 try
   cd job_${job_id} || fail
@@ -111,7 +77,6 @@ handle_return
 }
 
 fetch_a_task() {
-local_dive
 out "fetch_a_task"
 try
   mysql_query "
@@ -129,7 +94,6 @@ handle_return
 }
 
 launch_task() {
-local_dive
 out "launch_task job_id=$job_id"
 try
   grab_row task_request_id script_content script_parameters || { err "failed to get row from array."; fail }
@@ -161,7 +125,6 @@ main_loop() {
 local iteration=1 short_sleep
 min_wait=${min_wait:-50}
 max_wait=${max_wait:-70}
-local_dive
 out "arms_agent main_loop"
 try
   while true; do 
@@ -212,9 +175,50 @@ end_try
 handle_return
 }
 
-main_loop || exit 1
+main() {
+undive
+try
+  lock arms || { err "arms agent is already running"; exit 1; }
 
-# It's okay if exit happens before the lock is released. 
-# Stale locks are automatically cleaned up when this script starts.
-unlock arms &>/dev/null
+  if [ ! -f arms_agent.config ]; then
+    err "Missing arms_agent.config. It must exist in the current directory."
+    exit 1
+  fi
+
+  source arms_agent.config
+  require_var host_id db_host db_name db_pass || {
+    err "Make sure that you have defined this variable in your arms_agent.config file"
+    exit 1
+  }
+
+  db_user=agent_${host_id}
+
+  agent_tmp=/tmp/arms_agent
+  rm -rf $agent_tmp &>/dev/null
+  mkdir $agent_tmp || exit 1
+  cd $agent_tmp || exit 1
+
+  # optional variables which may be set in arms_agent.config, or in environment
+  #   max_processes : maximum number of processes to run at once
+  #   max_iterations : maximum number of times to pass through the main loop. If this is unset, will run indefinitely.
+  #   synchronous : if set, means tasks will be lauched syncronously instead of in the background
+  #   min_wait=50 : number of seconds, minimum, to wait between task pickup cycles
+  #   max_wait=70 : as above, but for maximum wait
+
+  initialize_process_tracking ${max_processes:-4}
+
+  out "Establishing db connection..."
+  establish_connection || exit 1
+
+  undive
+  main_loop || exit 1
+
+  # It's okay if exit happens before the lock is released. 
+  # Stale locks are automatically cleaned up when this script starts.
+  unlock arms &>/dev/null
+end_try
+handle_return
+}
+
+main || exit 1
 

@@ -4,17 +4,16 @@
 # soure this before other libraries
 
 shopt -s expand_aliases      # make sure aliases are expanded even for non-interactive scripts
-set -u                    # error when a script attempts to use an unset variable
+set -u                       # error when a script attempts to use an unset variable
 
 alias err='echo >&2 "ERROR:"'
-# indentation style
-#alias out='[ "${debug:-}" ] && [ $debug -gt 0 ] && printf %${indent}s && echo'
-# debug level style
 alias out='[ $debug -gt 0 ] && printf "[$debug] " && echo -e'
 alias out_short='[ $debug -gt 0 ] && echo -e'
+
+# dive and undive should be used immediately in front of a command or at the beginning of a function with a local debug
+#   or it will shift the debug level for all code that follows
 alias dive='debug=$((debug-1))'
 alias undive='debug=$((debug+1))'
-alias local_dive='local debug=$((debug-1))'
 
 # exception handling
 # usage example:
@@ -32,11 +31,11 @@ alias local_dive='local debug=$((debug-1))'
 #     handle_return
 #   }
 
-indent=0
+# default debug level is 1. Set to 0 for no output except for errors.
 debug=${debug:-1}
 # only run this once within a function definition
-alias try='indent=$((indent+1)); [ "${debug:-}" ] && debug=$((debug-1)); local return_value=0; while true; do'
-alias end_try='break; done; [ "${debug:-}" ] && debug=$((debug+1)); indent=$((indent-1))'
+alias try='local debug=$((debug-1)) return_value=0; while true; do'
+alias end_try='break; done; debug=$((debug+1))'
 
 alias fail='{ return_value=1; break; }'
 

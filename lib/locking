@@ -8,7 +8,6 @@ local location=$1; shift
 local timeout=${1:-}
 local lockfile=/var/lock/$location
 
-local_dive
 out "Attempting to obtain lock for $location"
 try
   if [ -d $lockfile ]; then
