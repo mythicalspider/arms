@@ -26,7 +26,6 @@ property class
 property group
   contains 0 or more properties
   may be nested
-  can't have two properties with the same name
   purpose
     easy access of specific properties
     control of resource provisioning
