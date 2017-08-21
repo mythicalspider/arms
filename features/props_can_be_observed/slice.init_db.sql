@@ -6,7 +6,6 @@ create table* prop (
   , observation_frequency tinyint not null comment '0 means no auto observation. 10 means wait 10 seconds between observations, 20=100 secs, 30=1000 secs' 
   , max_severity int default 0 not null comment '0 means failure will never generate alerts, 1 means minor failure, 2 major, etc' 
 ----------==========< jump to end >==========----------
-----------==========< insert exact >==========----------
 create table if not exists observation (
   observation_id int not null primary key
   , prop_id int not null

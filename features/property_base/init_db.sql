@@ -14,3 +14,4 @@ create table if not exists prop (
   , foreign key (prop_class_id) references prop_class(prop_class_id) on update cascade on delete cascade
   , foreign key (host_id) references host(host_id) on update cascade on delete cascade
 );
+

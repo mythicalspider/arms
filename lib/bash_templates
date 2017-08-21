@@ -15,9 +15,20 @@ handle_return
 # usage: cat file.slice | hydrate_slice {file name to patch}
 #   will patch the given file with the slice fed through stdin and 
 #   replace the target file with the patched result if successful
+#
+# slice file includes special commands which change the slice mode for the following lines
+# commands always look like: ---===< command >===---
+#   with 3 or more - and = on each side
+#   and command one of:
+#     find exact
+#     find wildcard
+#     find regex
+#     insert exact
+#     insert template
+#     ignore
 hydrate_slice() {
 try
-  local file in_file out_file command content reached_end found
+  local file in_file out_file command content reached_end found mode maybe_mode
   file="$1"
 
   out "Applying slice to file ${file}..."
@@ -34,13 +45,26 @@ try
   fi
   exec {out_file}>${file}.new || fail
 
-  while IFS= read -r slice_spec; do
-    command=${slice_spec:0:3}
-    content=${slice_spec:3}
+  mode="insert exact"
+  deepdive
+  while IFS= read -r content; do
+    if [[ "$content" =~ ---+===+\<\ (.*)\ \>===+---+ ]]; then
+      maybe_mode=${BASH_REMATCH[1]}
+      if [ "$maybe_mode" == 'jump to end' ]; then
+        out "jumped to end of file"
+        if [ ! "${reached_end:-}" ]; then
+          cat <&$in_file >&$out_file || fail
+          reached_end=yes
+        fi
+      else
+        mode=$maybe_mode
+        out "mode switch: [$mode]"
+      fi
+      continue
+    fi
 
-    case "$command" in
-      # find exact match
-      FE\ )
+    case "$mode" in
+      'find exact')
         unset found
         if [ ! "${reached_end:-}" ]; then
           while true; do
@@ -56,13 +80,12 @@ try
           done; maybe_break
         fi
 
-        if [ ! "$found" ]; then
+        if [ ! "${found:-}" ]; then
           err "Can't find the requested line: $content"
           fail
         fi
         ;;
-      # find wildcard match
-      FW\ )
+      'find wildcard')
         unset found
         if [ ! "${reached_end:-}" ]; then
           while true; do
@@ -78,13 +101,12 @@ try
           done; maybe_break
         fi
 
-        if [ ! "$found" ]; then
+        if [ ! "${found:-}" ]; then
           err "Can't find the requested line: $content"
           fail
         fi
         ;;
-      # find regex match
-      FR\ )
+      'find regex')
         unset found
         if [ ! "${reached_end:-}" ]; then
           while true; do
@@ -100,34 +122,29 @@ try
           done; maybe_break
         fi
 
-        if [ ! "$found" ]; then
+        if [ ! "${found:-}" ]; then
           err "Can't find the requested line: $content"
           fail
         fi
         ;;
-      # insert exact
-      IE\ )
+      'insert exact')
         echo "$content" >&$out_file
         ;;
-      # insert hydrated template
-      IT\ )
+      'insert template')
         line="${content//\"/\\\"}"
         eval "echo \"$line\"" >&$out_file || fail
         ;;
-      # jump to end of file
-      JE\ |JE)
-        cat <&$in_file >&$out_file || fail
-        reached_end=yes
+      'jump to end')
         ;;
-      # ignore this line (comment)
-      '## '|'')
+      'ignore')
         ;;
       *)
-        err "unknown slice command: [$command]"
+        err "unknown slice command: [$mode]"
         fail
         ;;
     esac
   done
+  deep_undive    
   maybe_break
 
   # flush remaining input file lines
@@ -136,6 +153,7 @@ try
   fi
 
   mv ${file}.new ${file} || fail
+  exec {in_file}<&- {out_file}>&-
 end_try
 handle_return
 }

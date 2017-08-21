@@ -44,11 +44,11 @@ standard_convention() {
   if [ -f init_db.sql ]; then
     cat init_db.sql >>$build_folder/init_db.sql || return 1
   fi
-  if [ -f init_db.sql.template ]; then
-    cat init_db.sql.template | hydrate_template >>$build_folder/init_db.sql || return 1
+  if [ -f template.init_db.sql ]; then
+    cat template.init_db.sql | hydrate_template >>$build_folder/init_db.sql || return 1
   fi
-  if [ -f init_db.sql.slice ]; then
-    cat init_db.sql.slice | hydrate_slice $build_folder/init_db.sql || return 1
+  if [ -f slice.init_db.sql ]; then
+    cat slice.init_db.sql | hydrate_slice $build_folder/init_db.sql || return 1
   fi
   if [ -d tests ]; then
     rcp tests/ $build_folder/tests/ >/dev/null || return 1
