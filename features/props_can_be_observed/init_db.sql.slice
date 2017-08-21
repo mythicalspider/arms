@@ -1,0 +1,44 @@
+FW create table * prop (
+FR ^ *, .*
+IE  , observation_frequency tinyint not null comment '0 means no auto observation. 10 means wait 10 seconds between observations, 20=100 secs, 30=1000 secs' 
+IE  , max_severity int default 0 not null comment '0 means failure will never generate alerts, 1 means minor failure, 2 major, etc' 
+JE
+IE 
+IE create table if not exists observation (
+IE   observation_id int not null primary key
+IE   , prop_id int not null
+IE   , event_time datetime not null
+IE   , observed_value varchar(255) not null
+IE   , foreign key (prop_id) references prop(prop_id) on update cascade on delete cascade
+IE );
+IE 
+IE create table if not exists observation_status (
+IE   prop_id int not null primary key
+IE   , wait_until datetime comment 'null means execute immediately'
+IE   , last_observation_id int comment 'null means it has not been observed yet'
+IE   , foreign key (last_observation_id) references observation(observation_id) on update cascade on delete set null
+IE   , foreign key (prop_id) references prop(prop_id) on update cascade on delete cascade
+IE );
+IE 
+IE delimiter $$
+IE create trigger if not exists after_prop_inserted_insert_observation_status
+IE   after insert on prop
+IE   for each row begin
+IE     insert into observation_status set
+IE       prop_id=NEW.prop_id
+IE     ;
+IE   end
+IE $$
+IE delimiter ;
+IE 
+IE delimiter $$
+IE create trigger if not exists after_observation_insert_update_observation_status
+IE   after insert on observation
+IE   for each row begin
+IE     update observation_status set last_observation_id=NEW.observation_id
+IE     where prop_id=NEW.prop_id
+IE     ;
+IE   end
+IE $$
+IE delimiter ;
+

@@ -12,3 +12,131 @@ end_try
 handle_return
 }
 
+# usage: cat file.slice | hydrate_slice {file name to patch}
+#   will patch the given file with the slice fed through stdin and 
+#   replace the target file with the patched result if successful
+hydrate_slice() {
+try
+  local file in_file out_file command content reached_end found
+  file="$1"
+
+  out "Applying slice to file ${file}..."
+
+  if [ -f "${file}.new" ]; then
+    err "${file}.new already exists. This is needed to create the temporary version of the patched file."
+    fail
+  fi
+
+  if [ -f "$file" ]; then
+    exec {in_file}<${file} || fail
+  else
+    reached_end=yes
+  fi
+  exec {out_file}>${file}.new || fail
+
+  while IFS= read -r slice_spec; do
+    command=${slice_spec:0:3}
+    content=${slice_spec:3}
+
+    case "$command" in
+      # find exact match
+      FE\ )
+        unset found
+        if [ ! "${reached_end:-}" ]; then
+          while true; do
+            IFS= read -ru ${in_file} line || {
+              reached_end=yes
+              break
+            }
+            echo "$line" >&$out_file || fail
+            if [[ "$line" == "$content" ]]; then
+              found=yes
+              break
+            fi
+          done; maybe_break
+        fi
+
+        if [ ! "$found" ]; then
+          err "Can't find the requested line: $content"
+          fail
+        fi
+        ;;
+      # find wildcard match
+      FW\ )
+        unset found
+        if [ ! "${reached_end:-}" ]; then
+          while true; do
+            IFS= read -ru ${in_file} line || {
+              reached_end=yes
+              break
+            }
+            echo "$line" >&$out_file || fail
+            if eval "[[ \"$line\" == \"${content//\*/\"*\"}\" ]]"; then
+              found=yes
+              break
+            fi
+          done; maybe_break
+        fi
+
+        if [ ! "$found" ]; then
+          err "Can't find the requested line: $content"
+          fail
+        fi
+        ;;
+      # find regex match
+      FR\ )
+        unset found
+        if [ ! "${reached_end:-}" ]; then
+          while true; do
+            IFS= read -ru ${in_file} line || {
+              reached_end=yes
+              break
+            }
+            echo "$line" >&$out_file || fail
+            if eval "[[ \"$line\" =~ ${content// /\\ } ]]"; then
+              found=yes
+              break
+            fi
+          done; maybe_break
+        fi
+
+        if [ ! "$found" ]; then
+          err "Can't find the requested line: $content"
+          fail
+        fi
+        ;;
+      # insert exact
+      IE\ )
+        echo "$content" >&$out_file
+        ;;
+      # insert hydrated template
+      IT\ )
+        line="${content//\"/\\\"}"
+        eval "echo \"$line\"" >&$out_file || fail
+        ;;
+      # jump to end of file
+      JE\ |JE)
+        cat <&$in_file >&$out_file || fail
+        reached_end=yes
+        ;;
+      # ignore this line (comment)
+      '## '|'')
+        ;;
+      *)
+        err "unknown slice command: [$command]"
+        fail
+        ;;
+    esac
+  done
+  maybe_break
+
+  # flush remaining input file lines
+  if [ ! "${reached_end:-}" ]; then
+    cat <&$in_file >&$out_file || fail
+  fi
+
+  mv ${file}.new ${file} || fail
+end_try
+handle_return
+}
+
