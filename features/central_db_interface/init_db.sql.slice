@@ -1,6 +1,0 @@
-IE -- comment this out if you don't want to start from a clean slate
-IT drop database if exists $central_db_name;
-IT create database if not exists $central_db_name;
-IT use $central_db_name;
-IE set default_storage_engine=InnoDB;
-
