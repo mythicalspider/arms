@@ -31,9 +31,9 @@ create trigger if not exists after_prop_inserted_insert_observation_status
     ;
   end
 $$
-delimiter ;
+-- delimiter ;
 
-delimiter $$
+-- delimiter $$
 create trigger if not exists after_observation_insert_update_observation_status
   after insert on observation
   for each row begin

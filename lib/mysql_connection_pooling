@@ -161,7 +161,7 @@ return 0
 #   will not return results
 #   every statement must end with a semicolon at the end of the line (nothing must follow it). 
 function mysql_bulk {
-local handle bulk query affected line results_open row_open cols key val timed_out delimiter ready
+local handle bulk query affected line results_open row_open cols key val timed_out ready
 bulk=$1
 bulk=$(echo "$bulk" | strip_bar_comments | aligned_trim)
 out "mysql_bulk"
@@ -175,10 +175,7 @@ try
   # this complication is needed to avoid piping the value into the while loop, 
   #   and thus causing mysql_query to run in a subprocesses,
   #   making it not able to access the mysql connector process
-  #open_fifo 3
-  #echo "$bulk" >&3 #&
-  #while read -r -u 3 line; do
-  delimiter=\;
+  sql_delimiter=${sql_delimiter:-\;}
   while IFS= read -r line; do
     if [ "$line" ]; then
       if [ "${query:-}" ]; then
@@ -188,11 +185,11 @@ try
       fi
     fi
     if [[ "$line" =~ ^delimiter\ (.*)$ ]]; then
-      delimiter=${BASH_REMATCH[1]}
-      deep_out "Changing delimiter to: [$delimiter]"
+      sql_delimiter=${BASH_REMATCH[1]}
+      deep_out "Changing delimiter to: [$sql_delimiter]"
       ready=true
     fi
-    if [[ "$line" == *$delimiter ]]; then
+    if [[ "$line" == *$sql_delimiter ]]; then
       ready=true
     fi
     if [ "${ready:-}" ]; then
@@ -201,7 +198,6 @@ try
       unset ready
     fi
   done < <(echo "$bulk"); maybe_break
-  #close_fifo 3
 
   if [ "${query:-}" ]; then
     skip_check=true mysql_query "$query" || fail
@@ -221,6 +217,7 @@ local handle query affected line results_open row_open cols key val timed_out
 query=$1
 query=$(echo "$query" | strip_bar_comments | aligned_trim)
 out "mysql_query\n${query}"
+sql_delimiter=${sql_delimiter:-\;}
 try
   handle=(${HANDLE//_/ })
   if [ ! "${skip_check:-}" ]; then
@@ -236,9 +233,9 @@ try
   # delimit query; otherwise we block forever/timeout
   # nevermind:  if we timeout here, fix the incoming query
   #   we need to be able to handle alternative delimiters as is required by trigger definitions for example
-  #if [[ ! "$query" == *\; ]]; then
-  #  query="$query;"
-  #fi
+  if [[ ! "$query" == *$sql_delimiter ]]; then
+    query="$query$sql_delimiter"
+  fi
 
   out "Sending query..."
   echo "$query" >&${handle[1]} || {
