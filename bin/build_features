@@ -20,7 +20,7 @@ verify_dependencies() {
         fi
       done
       if [ ! "$found" ]; then 
-        err "error: feature [$feature] requires [$dependency] to be present earlier in the featureset"
+        err "feature [$feature] requires [$dependency] to be present earlier in the featureset"
         return 1
       fi
     done
@@ -73,7 +73,7 @@ process_features() {
     eval "${feature_line[*]:1}"
 
     if [ ! -d features/$feature ]; then
-      err "error: missing feature: $feature"
+      err "missing feature: $feature"
       exit 1
     fi
     out "Before feature: $feature"
